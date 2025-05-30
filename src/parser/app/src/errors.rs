@@ -12,6 +12,7 @@ pub struct GrpcError {
 
 impl GrpcError {
     /// creates a new gRPC error to be returned to the caller
+    #[must_use]
     pub fn new(code: Code, message: &str) -> Self {
         GrpcError {
             code,
@@ -20,6 +21,7 @@ impl GrpcError {
     }
 
     /// creates a new internal error
+    #[must_use]
     pub fn internal(message: &str) -> Self {
         Self::new(Code::Internal, message)
     }

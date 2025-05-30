@@ -1,4 +1,4 @@
-//! VisualSign Parser
+//! `VisualSign` Parser
 #![forbid(unsafe_code)]
 #![deny(clippy::all, clippy::unwrap_used)]
 #![warn(missing_docs, clippy::pedantic)]

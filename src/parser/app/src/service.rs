@@ -14,6 +14,7 @@ pub struct Processor {
 
 impl Processor {
     /// Creates a new request processor. The only argument needed is an ephemeral key handle.
+    #[must_use]
     pub fn new(handle: EphemeralKeyHandle) -> Self {
         Self { handle }
     }
@@ -58,7 +59,7 @@ impl RequestProcessor for Processor {
             .ok_or({
                 qos_parser_response::Output::Status(Status {
                     code: Code::Internal as i32,
-                    message: format!("missing request input"),
+                    message: "missing request input".to_string(),
                     details: vec![],
                 })
             })

@@ -1,4 +1,4 @@
-//! Parsing endpoint for VisualSign
+//! Parsing endpoint for `VisualSign`
 
 use generated::{
     google::rpc::Code,
