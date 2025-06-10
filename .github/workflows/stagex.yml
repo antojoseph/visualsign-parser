@@ -4,8 +4,8 @@ on:
   push:
     tags:
       - "v*.*.*"
-    branches:
-      - main
+    branches: # run on every branch for dev of this workflow
+      - "**" # TODO: switch this to 'main'
     paths:
       - ".github/**"
       - "src/**"
