@@ -9,10 +9,12 @@ on:
     paths:
       - ".github/**"
       - "src/**"
+      - "Makefile"
   pull_request:
     paths:
       - ".github/**"
       - "src/**"
+      - "Makefile"
   workflow_dispatch: # Allows manual invocation
 
 jobs:

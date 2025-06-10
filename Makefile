@@ -28,7 +28,7 @@ endef
 define build
 	$(eval NAME := $(1))
 	$(eval TYPE := $(if $(2),$(2),dir))
-	$(eval REGISTRY := anchorage-oss-visualsign-parser)
+	$(eval REGISTRY := anchorageoss-visualsign-parser)
 	$(eval PLATFORM := linux/amd64)
 	DOCKER_BUILDKIT=1 \
 	SOURCE_DATE_EPOCH=1 \
@@ -38,7 +38,7 @@ define build
 		--tag $(REGISTRY)/$(NAME) \
 		--progress=plain \
 		--platform=$(PLATFORM) \
-		--label "org.opencontainers.image.source=https://github.com/anchorage-oss/visualsign-parser" \
+		--label "org.opencontainers.image.source=https://github.com/anchorageoss/visualsign-parser" \
 		$(if $(filter common,$(NAME)),,$(call build_context,$(1))) \
 		$(if $(filter 1,$(NOCACHE)),--no-cache) \
 		--output "\
