@@ -26,10 +26,7 @@ pub fn parse(
 
     let signable_payload = String::from("fill in parsed signable payload");
 
-    let payload = ParsedTransactionPayload {
-        request_payload,
-        signable_payload,
-    };
+    let payload = ParsedTransactionPayload { signable_payload };
 
     let digest = sha_256(&borsh::to_vec(&payload).expect("payload implements borsh::Serialize"));
     let sig = ephemeral_key

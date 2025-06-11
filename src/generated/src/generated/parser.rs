@@ -104,10 +104,6 @@ pub struct Metadata {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParsedTransactionPayload {
-    /// repeated Metadata transaction_metadata = 1;
-    /// repeated Metadata method_metadata = 2;
-    #[prost(string, tag = "3")]
-    pub request_payload: ::prost::alloc::string::String,
     #[prost(string, tag = "4")]
     pub signable_payload: ::prost::alloc::string::String,
 }
