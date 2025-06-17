@@ -69,6 +69,8 @@ pub mod qos_parser_response {
 pub struct ParseRequest {
     #[prost(string, tag = "1")]
     pub unsigned_payload: ::prost::alloc::string::String,
+    #[prost(enumeration = "Chain", tag = "2")]
+    pub chain: i32,
 }
 #[cfg_attr(
     feature = "serde_derive",

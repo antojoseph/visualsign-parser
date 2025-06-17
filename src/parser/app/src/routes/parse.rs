@@ -9,8 +9,22 @@ use generated::{
 };
 use qos_crypto::sha_256;
 use qos_p256::P256Pair;
+use visualsign_solana::SolanaTransactionWrapper;
 
-use crate::errors::GrpcError;
+// TODO(pg): this may not be the right place for this
+fn create_registry() -> visualsign::registry::TransactionConverterRegistry {
+    let mut registry = visualsign::registry::TransactionConverterRegistry::new();
+    registry.register::<SolanaTransactionWrapper, _>(
+        visualsign::registry::Chain::Solana,
+        visualsign_solana::SolanaVisualSignConverter,
+    );
+    registry
+}
+
+use crate::{chain_conversion, errors::GrpcError};
+use generated::parser::Chain as ProtoChain;
+use visualsign::registry::Chain as VisualSignRegistryChain;
+use visualsign::vsptrait::VisualSignOptions;
 
 pub fn parse(
     parse_request: ParseRequest,
@@ -24,7 +38,32 @@ pub fn parse(
         ));
     }
 
-    let signable_payload = String::from("fill in parsed signable payload");
+    // todo: make these request args or metadata
+    let options = VisualSignOptions {
+        decode_transfers: true,
+        transaction_name: None,
+    };
+    let registry = create_registry();
+    let proto_chain = ProtoChain::from_i32(parse_request.chain)
+        .ok_or_else(|| GrpcError::new(Code::InvalidArgument, "invalid chain"))?;
+    let registry_chain: VisualSignRegistryChain = chain_conversion::proto_to_registry(proto_chain);
+
+    let signable_payload_str = registry
+        .convert_transaction(&registry_chain, &request_payload.as_str(), options)
+        .map_err(|e| {
+            GrpcError::new(
+                Code::InvalidArgument,
+                &format!("Failed to parse transaction: {}", e),
+            )
+        })?;
+
+    // Convert SignablePayload to String (assuming you want JSON)
+    let signable_payload = serde_json::to_string(&signable_payload_str).map_err(|e| {
+        GrpcError::new(
+            Code::Internal,
+            &format!("Failed to serialize payload: {}", e),
+        )
+    })?;
 
     let payload = ParsedTransactionPayload { signable_payload };
 

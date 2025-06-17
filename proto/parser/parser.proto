@@ -46,6 +46,7 @@ message QOSParserResponse {
 
 message ParseRequest {
   string unsigned_payload = 1;
+  Chain chain = 2;
 }
 
 message ParseResponse {
