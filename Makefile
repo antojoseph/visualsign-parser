@@ -33,7 +33,7 @@ define build
 	SOURCE_DATE_EPOCH=1 \
 	BUILDKIT_MULTIPLATFORM=1 \
 	docker build \
-		--secret id=github_token,src=- . -
+		--build-arg GITHUB_TOKEN=$(GITHUB_TOKEN) \
 		--build-arg VERSION=$(VERSION) \
 		--tag $(REGISTRY)/$(NAME) \
 		--progress=plain \

@@ -12,10 +12,7 @@ ADD src /src
 WORKDIR /src/
 
 # pre-fetch all workspace deps; we need to them to build with `--network=none` later
-RUN --mount=type=secret,id=github_token \
-    GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
-    git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/" && \
-    cargo fetch
+RUN cargo fetch
 
 WORKDIR /src/parser/app
 RUN --network=none <<-EOF
