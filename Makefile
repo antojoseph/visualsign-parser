@@ -22,7 +22,7 @@ ifneq ($(strip $(GITHUB_TOKEN)),)
     SECRET_FILE := $(shell mktemp -u --tmpdir docker-secret-XXXXXXXXXX)
     DOCKER_BUILD_ARGS += --secret id=github_token,src=$(SECRET_FILE)
     WRITE_SECRET_CMD = @echo "Writing token to $(SECRET_FILE)" && echo "$(GITHUB_TOKEN)" > $(SECRET_FILE)
-    REMOVE_SECRET_CMD = @echo "Removing $(SECRET_FILE)" && rm -f $(SECRET_FILE)
+    REMOVE_SECRET_CMD = @echo "Removing $(SECRET_FILE)" && rm -f $(SECRET_FILE) || true
 else
     $(info No GitHub token found, skipping secret)
     WRITE_SECRET_CMD = @echo "No GitHub token provided"
