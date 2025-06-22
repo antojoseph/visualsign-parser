@@ -9,10 +9,6 @@ out/parser_app/index.json: \
 # Import environment variable
 GITHUB_TOKEN := $(shell echo $$GITHUB_TOKEN)
 
-# Debug what we got
-$(info GITHUB_TOKEN imported: '$(GITHUB_TOKEN)')
-$(info GITHUB_TOKEN length: $(shell echo '$(GITHUB_TOKEN)' | wc -c))
-
 # Base docker args
 DOCKER_BUILD_ARGS = --build-arg VERSION=$(VERSION)
 
@@ -30,12 +26,6 @@ else
 endif
 
 $(info Final DOCKER_BUILD_ARGS: $(DOCKER_BUILD_ARGS))
-
-.PHONY: debug-token
-debug-token:
-    @echo "GITHUB_TOKEN from env: '$$GITHUB_TOKEN'"
-    @echo "GITHUB_TOKEN in make: '$(GITHUB_TOKEN)'"
-    @echo "Length: $(shell echo '$(GITHUB_TOKEN)' | wc -c)"
 
 
 .PHONY: non-oci-docker-images
@@ -55,17 +45,6 @@ $$( \
 	done; \
 )
 endef
-
-.PHONY: debug-make-vars
-debug-make-vars:
-	@echo "=== MAKE VARIABLE DEBUG ==="
-	@echo "Raw env GITHUB_TOKEN: '$$GITHUB_TOKEN'"
-	@echo "Make GITHUB_TOKEN: '$(GITHUB_TOKEN)'"
-	@echo "GITHUB_TOKEN empty check: '$(if $(GITHUB_TOKEN),NOT EMPTY,EMPTY)'"
-	@echo "ifneq condition: '$(shell if [ -n '$(GITHUB_TOKEN)' ]; then echo TRUE; else echo FALSE; fi)'"
-	@echo "DOCKER_BUILD_ARGS: '$(DOCKER_BUILD_ARGS)'"
-	@echo "SECRET_FILE: '$(SECRET_FILE)'"
-	@echo "=== END DEBUG ==="
 
 ,:=,
 define build
