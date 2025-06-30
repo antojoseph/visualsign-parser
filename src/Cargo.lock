@@ -1698,6 +1698,7 @@ dependencies = [
 name = "integration"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "borsh 1.5.7",
  "bs58",
  "chrono",

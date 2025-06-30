@@ -40,3 +40,6 @@ k256 = { version = "0.12", features = [
   "ecdsa-core",
 ], default-features = false }
 bs58 = { version = "0.5.1", default-features = false }
+
+# for encoding and decoding txs
+base64 = "0.22.1"

@@ -215,7 +215,6 @@ fn convert_to_visual_sign_payload(
             .iter()
             .map(|&index| message.account_keys[index as usize].to_string())
             .collect();
-        println!("Instruction {} Accounts: {:?}", i, accounts);
         let data = hex::encode(&instruction.data);
 
         let decoded_data = match program_id.as_str() {
@@ -324,8 +323,8 @@ fn convert_to_visual_sign_payload(
         };
 
         let fallback_instruction_str = format!(
-            "Program ID: {}\nAccounts: {:?}\nData: {}",
-            program_id, accounts, data
+            "Program ID: {program_id}
+Data: {data}"
         );
 
         fields.push(SignablePayloadField::PreviewLayout {
