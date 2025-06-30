@@ -81,6 +81,7 @@ fn decode_transaction(
         }
         SupportedEncodings::Hex => hex::decode(raw_transaction)?,
     };
+    
 
     let transaction: SolanaTransaction = bincode::deserialize(&bytes)?;
     Ok(transaction)

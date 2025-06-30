@@ -1,5 +1,8 @@
 use std::fmt;
 
+// Not every chain will support all the encodings, in which case they
+// should return an error TransactionParseError::UnsupportedEncoding
+// when the encoding is not supported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SupportedEncodings {
     Base64,

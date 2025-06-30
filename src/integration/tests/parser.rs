@@ -1,4 +1,4 @@
-use base64;
+use base64::Engine;
 use generated::health::{AppHealthRequest, AppHealthResponse};
 use generated::parser::{Chain, ParseRequest};
 use integration::TestArgs;
@@ -6,7 +6,9 @@ use integration::TestArgs;
 /// Helper function to create a complete Solana transaction from a message with empty signatures
 fn create_solana_transaction_with_empty_signatures(message_base64: &str) -> String {
     // Decode the message
-    let message_bytes = base64::decode(message_base64).unwrap();
+    let message_bytes = base64::engine::general_purpose::STANDARD
+        .decode(message_base64)
+        .unwrap();
 
     // Create a complete Solana transaction with empty signatures
     let mut transaction_bytes = Vec::new();
@@ -18,7 +20,7 @@ fn create_solana_transaction_with_empty_signatures(message_base64: &str) -> Stri
     transaction_bytes.extend_from_slice(&message_bytes);
 
     // Encode the complete transaction back to base64
-    base64::encode(transaction_bytes)
+    base64::engine::general_purpose::STANDARD.encode(transaction_bytes)
 }
 
 /// Recursively validates that all fields in expected are present in actual

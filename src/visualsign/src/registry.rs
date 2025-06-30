@@ -278,7 +278,7 @@ mod tests {
 
         while let (Some(a), Some(b)) = (chars.next(), chars.next()) {
             let byte = match (a.to_digit(16), b.to_digit(16)) {
-                (Some(high), Some(low)) => (high as u8) << 4 | (low as u8),
+                (Some(high), Some(low)) => ((high as u8) << 4) | (low as u8),
                 _ => return Err("Invalid hex character"),
             };
             result.push(byte);
