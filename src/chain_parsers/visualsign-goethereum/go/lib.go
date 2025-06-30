@@ -177,7 +177,7 @@ func (d *TransactionDecoder) decodeCalldata(data []byte, contractABI abi.ABI, co
 
 	// Extract method selector (first 4 bytes)
 	methodID := data[:4]
-	
+
 	// Find matching method in ABI
 	method, err := contractABI.MethodById(methodID)
 	if err != nil {
