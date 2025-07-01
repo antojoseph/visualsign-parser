@@ -680,7 +680,7 @@ fn create_default_expanded_fields(program_id: &str, data: &[u8]) -> SignablePayl
     SignablePayloadFieldListLayout {
         fields: vec![
             create_text_field("Program ID", program_id),
-            create_text_field("Data", &hex::encode(data)),
+            create_text_field("Raw Data", &hex::encode(data)),
         ],
     }
 }
