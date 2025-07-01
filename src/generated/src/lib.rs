@@ -21,9 +21,6 @@ include!("generated/_include.rs");
 #[cfg(feature = "tonic_types")]
 pub const FILE_DESCRIPTOR_SET: &[u8] = include_bytes!("generated/descriptor.bin");
 
-use google::rpc::Status;
-use prost::Message;
-
 #[cfg(feature = "tonic_types")]
 impl From<Status> for tonic::Status {
     fn from(status: Status) -> Self {
