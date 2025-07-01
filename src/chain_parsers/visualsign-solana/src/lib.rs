@@ -404,11 +404,11 @@ fn format_system_instruction(instruction: &SystemInstruction) -> String {
                 "Create Account: {} lamports, {} bytes, owner: {}",
                 lamports,
                 space,
-                owner.to_string()
+                owner
             )
         }
         SystemInstruction::Assign { owner } => {
-            format!("Assign Account Owner: {}", owner.to_string())
+            format!("Assign Account Owner: {}", owner)
         }
         SystemInstruction::Transfer { lamports } => {
             format!("Transfer: {} lamports", lamports)
@@ -422,11 +422,11 @@ fn format_system_instruction(instruction: &SystemInstruction) -> String {
         } => {
             format!(
                 "Create Account with Seed: base: {}, seed: '{}', {} lamports, {} bytes, owner: {}",
-                base.to_string(),
+                base,
                 seed,
                 lamports,
                 space,
-                owner.to_string()
+                owner
             )
         }
         SystemInstruction::AdvanceNonceAccount => "Advance Nonce Account".to_string(),
@@ -436,13 +436,13 @@ fn format_system_instruction(instruction: &SystemInstruction) -> String {
         SystemInstruction::InitializeNonceAccount(authorized) => {
             format!(
                 "Initialize Nonce Account: authorized: {}",
-                authorized.to_string()
+                authorized
             )
         }
         SystemInstruction::AuthorizeNonceAccount(authorized) => {
             format!(
                 "Authorize Nonce Account: new authorized: {}",
-                authorized.to_string()
+                authorized
             )
         }
         SystemInstruction::Allocate { space } => {
@@ -456,18 +456,18 @@ fn format_system_instruction(instruction: &SystemInstruction) -> String {
         } => {
             format!(
                 "Allocate with Seed: base: {}, seed: '{}', {} bytes, owner: {}",
-                base.to_string(),
+                base,
                 seed,
                 space,
-                owner.to_string()
+                owner
             )
         }
         SystemInstruction::AssignWithSeed { base, seed, owner } => {
             format!(
                 "Assign with Seed: base: {}, seed: '{}', owner: {}",
-                base.to_string(),
+                base,
                 seed,
-                owner.to_string()
+                owner
             )
         }
         SystemInstruction::TransferWithSeed {
@@ -479,7 +479,7 @@ fn format_system_instruction(instruction: &SystemInstruction) -> String {
                 "Transfer with Seed: {} lamports, seed: '{}', from owner: {}",
                 lamports,
                 from_seed,
-                from_owner.to_string()
+                from_owner
             )
         }
         SystemInstruction::UpgradeNonceAccount => "Upgrade Nonce Account".to_string(),
