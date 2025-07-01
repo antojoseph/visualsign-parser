@@ -337,6 +337,25 @@ fn convert_to_visual_sign_payload(
                     create_default_expanded_fields(&program_id, &instruction.data)
                 }
             }
+            program_id if program_id.starts_with("AToken") => {
+                if let Ok(instruction_type) = parse_ata_instruction(&instruction.data) {
+                    format_associated_token_instruction(&instruction_type)
+                } else {
+                    create_default_expanded_fields(&program_id, &instruction.data)
+                }
+            }
+            program_id if program_id.starts_with("SPoo1") => {
+                if let Ok(instruction_type) = parse_stake_pool_instruction(&instruction.data) {
+                    SignablePayloadFieldListLayout {
+                        fields: vec![create_text_field(
+                            "Stake Pool Instruction",
+                            &format_stake_pool_instruction(&instruction_type),
+                        )],
+                    }
+                } else {
+                    create_default_expanded_fields(&program_id, &instruction.data)
+                }
+            }
             _ => create_default_expanded_fields(&program_id, &instruction.data),
         };
 
@@ -476,6 +495,17 @@ fn format_ata_instruction(instruction: &AssociatedTokenAccountInstruction) -> St
         AssociatedTokenAccountInstruction::RecoverNested => {
             "Recover Nested Associated Token Account".to_string()
         }
+    }
+}
+
+fn format_associated_token_instruction(
+    instruction: &AssociatedTokenAccountInstruction,
+) -> SignablePayloadFieldListLayout {
+    SignablePayloadFieldListLayout {
+        fields: vec![
+            create_text_field("Program ID", "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
+            create_text_field("Instruction", &format_ata_instruction(instruction)),
+        ],
     }
 }
 
