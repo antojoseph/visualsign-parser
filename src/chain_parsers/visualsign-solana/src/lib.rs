@@ -344,7 +344,7 @@ fn convert_to_visual_sign_payload(
                     create_default_expanded_fields(program_id, &instruction.data)
                 }
             }
-            "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy" => {
+            program_id if program_id.starts_with("SPoo1") => {
                 if let Ok(instruction_type) = parse_stake_pool_instruction(&instruction.data) {
                     SignablePayloadFieldListLayout {
                         fields: vec![create_text_field(
