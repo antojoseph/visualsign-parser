@@ -2,6 +2,7 @@ use base64::engine::Engine;
 use borsh::de::BorshDeserialize;
 use solana_parser::solana::parser::parse_transaction;
 use solana_program::system_instruction::SystemInstruction;
+use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::transaction::Transaction as SolanaTransaction;
 use spl_associated_token_account::instruction::AssociatedTokenAccountInstruction;
 use spl_stake_pool::instruction::StakePoolInstruction;
@@ -109,18 +110,12 @@ fn parse_ata_instruction(data: &[u8]) -> Result<AssociatedTokenAccountInstructio
     }
 }
 
-fn parse_compute_budget_instruction(
-    data: &[u8],
-) -> Result<solana_sdk::compute_budget::ComputeBudgetInstruction, &'static str> {
-    solana_sdk::compute_budget::ComputeBudgetInstruction::try_from_slice(data)
+fn parse_compute_budget_instruction(data: &[u8]) -> Result<ComputeBudgetInstruction, &'static str> {
+    ComputeBudgetInstruction::try_from_slice(data)
         .map_err(|_| "Failed to decode compute budget instruction")
 }
 
-fn format_compute_budget_instruction(
-    instruction: &solana_sdk::compute_budget::ComputeBudgetInstruction,
-) -> String {
-    use solana_sdk::compute_budget::ComputeBudgetInstruction;
-
+fn format_compute_budget_instruction(instruction: &ComputeBudgetInstruction) -> String {
     match instruction {
         ComputeBudgetInstruction::RequestHeapFrame(bytes) => {
             format!("Request Heap Frame: {} bytes", bytes)
@@ -610,12 +605,10 @@ fn create_amount_field(
     }
 }
 fn create_compute_budget_expanded_fields(
-    instruction: &solana_sdk::compute_budget::ComputeBudgetInstruction,
+    instruction: &ComputeBudgetInstruction,
     program_id: &str,
     data: &[u8],
 ) -> Vec<AnnotatedPayloadField> {
-    use solana_sdk::compute_budget::ComputeBudgetInstruction;
-
     let mut fields = vec![create_text_field("Program ID", program_id)];
 
     // Add specific fields based on instruction type

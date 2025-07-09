@@ -139,7 +139,6 @@ async fn parser_solana_native_transfer_e2e() {
     async fn test(test_args: TestArgs) {
         // Base64 encoded Solana transfer transaction
         // This was generated using the Solana CLI using solana transfer --sign-only which only prints message, that needs to be wrapped into a transaction
-        // let solana_transfer_message = "AQABA/vgkNkfnOBm+03UvAGzKxIiY/EUhIUGtwFgGKTg7zW14SNc89MK6BlbxE3LXXr+fSM83MDCJQ1wYYDwn39kZloAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALHd9i9ddFp9Pbk7SBekGKS8baviinT//+klSnP/gLqsAQICAAEMAgAAAACAxqR+jQMA";
         let solana_transfer_message = "AgABA3Lgs31rdjnEG5FRyrm2uAi4f+erGdyJl0UtJyMMLGzC9wF+t3qhmhpj3vI369n5Ef5xRLms/Vn8J/Lc7bmoIkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMBafBISARibJ+I25KpHkjLe53ZrqQcLWGy8n97yWD7mAQICAQAMAgAAAADKmjsAAAAA";
 
         let solana_tx = create_solana_transaction_with_empty_signatures(solana_transfer_message);
@@ -147,7 +146,6 @@ async fn parser_solana_native_transfer_e2e() {
             unsigned_payload: solana_tx,
             chain: Chain::Solana as i32,
         };
-        println!("Solana transaction: {}", parse_request.unsigned_payload);
 
         let parse_response = test_args
             .parser_client
