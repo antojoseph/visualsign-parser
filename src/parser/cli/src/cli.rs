@@ -1,5 +1,4 @@
 use clap::{Arg, Command};
-use std::process;
 
 use crate::chains;
 use chains::{available_chains, parse_chain};
@@ -22,7 +21,7 @@ fn create_registry() -> visualsign::registry::TransactionConverterRegistry {
     registry
 }
 
-fn parse_and_display(chain: &str, raw_tx: &str, options: VisualSignOptions) -> () {
+fn parse_and_display(chain: &str, raw_tx: &str, options: VisualSignOptions) {
     let registry_chain = parse_chain(chain);
 
     let registry = create_registry();
@@ -81,12 +80,6 @@ impl Cli {
             transaction_name: None,
         };
 
-        match parse_and_display(chain, raw_tx, options) {
-            Ok(()) => {}
-            Err(e) => {
-                eprintln!("Error: {e}");
-                process::exit(1);
-            }
-        }
+        parse_and_display(chain, raw_tx, options);
     }
 }
