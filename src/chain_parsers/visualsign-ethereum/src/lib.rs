@@ -1,6 +1,7 @@
 use alloy_consensus::{Transaction as _, TxType, TypedTransaction};
 use alloy_primitives::{U256, utils::format_units};
 use alloy_rlp::{Buf, Decodable};
+use alloy_sol_types::{SolCall, sol};
 use base64::{Engine as _, engine::general_purpose::STANDARD as b64};
 use visualsign::{
     SignablePayload, SignablePayloadField, SignablePayloadFieldCommon, SignablePayloadFieldTextV2,
@@ -36,6 +37,29 @@ fn trim_trailing_zeros(s: String) -> String {
 // Helper function to format wei to ether
 fn format_ether(wei: U256) -> String {
     trim_trailing_zeros(format_units(wei, 18).unwrap_or_else(|_| wei.to_string()))
+}
+
+// Helper function to format wei to gwei
+fn format_gwei<T: Into<alloy_primitives::U256> + ToString + Copy>(wei: T) -> String {
+    format_units(wei, 9).unwrap_or_else(|_| wei.to_string())
+}
+
+sol! {
+    #[sol(rpc)]
+    interface IERC20 {
+        function name() external view returns (string memory);
+        function symbol() external view returns (string memory);
+        function decimals() external view returns (uint8);
+        function totalSupply() external view returns (uint256);
+        function balanceOf(address account) external view returns (uint256);
+        function transfer(address to, uint256 amount) external returns (bool);
+        function allowance(address owner, address spender) external view returns (uint256);
+        function approve(address spender, uint256 amount) external returns (bool);
+        function transferFrom(address from, address to, uint256 amount) external returns (bool);
+
+        event Transfer(address indexed from, address indexed to, uint256 value);
+        event Approval(address indexed owner, address indexed spender, uint256 value);
+    }
 }
 
 /// Wrapper around Alloy's transaction type that implements the Transaction trait
@@ -214,17 +238,122 @@ fn convert_to_visual_sign_payload(
         },
     ]);
 
-    if let Some(gas_price) = transaction.gas_price() {
-        let gas_price_text = format!("{} ETH", format_ether(U256::from(gas_price)));
-        fields.push(SignablePayloadField::TextV2 {
-            common: SignablePayloadFieldCommon {
-                fallback_text: gas_price_text.clone(),
-                label: "Gas Price".to_string(),
-            },
-            text_v2: SignablePayloadFieldTextV2 {
-                text: gas_price_text,
-            },
-        });
+    // Handle gas pricing based on transaction type
+    match &transaction {
+        TypedTransaction::Legacy(tx) => {
+            let gas_price_text = format!("{} gwei", format_gwei(tx.gas_price));
+            fields.push(SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: gas_price_text.clone(),
+                    label: "Gas Price".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: gas_price_text,
+                },
+            });
+        }
+        TypedTransaction::Eip2930(tx) => {
+            let gas_price_text = format!("{} gwei", format_gwei(tx.gas_price));
+            fields.push(SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: gas_price_text.clone(),
+                    label: "Gas Price".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: gas_price_text,
+                },
+            });
+        }
+        TypedTransaction::Eip1559(tx) => {
+            let max_fee_text = format!("{} gwei", format_gwei(tx.max_fee_per_gas));
+            let priority_fee_text = format!("{} gwei", format_gwei(tx.max_priority_fee_per_gas));
+            fields.push(SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: max_fee_text.clone(),
+                    label: "Max Fee Per Gas".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: max_fee_text,
+                },
+            });
+            fields.push(SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: priority_fee_text.clone(),
+                    label: "Max Priority Fee Per Gas".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: priority_fee_text,
+                },
+            });
+        }
+        TypedTransaction::Eip4844(tx) => match tx {
+            alloy_consensus::TxEip4844Variant::TxEip4844(inner_tx) => {
+                let max_fee_text = format!("{} gwei", format_gwei(inner_tx.max_fee_per_gas));
+                let priority_fee_text = format!("{} gwei", format_gwei(inner_tx.max_priority_fee_per_gas));
+                fields.push(SignablePayloadField::TextV2 {
+                    common: SignablePayloadFieldCommon {
+                        fallback_text: max_fee_text.clone(),
+                        label: "Max Fee Per Gas".to_string(),
+                    },
+                    text_v2: SignablePayloadFieldTextV2 {
+                        text: max_fee_text,
+                    },
+                });
+                fields.push(SignablePayloadField::TextV2 {
+                    common: SignablePayloadFieldCommon {
+                        fallback_text: priority_fee_text.clone(),
+                        label: "Max Priority Fee Per Gas".to_string(),
+                    },
+                    text_v2: SignablePayloadFieldTextV2 {
+                        text: priority_fee_text,
+                    },
+                });
+            }
+            alloy_consensus::TxEip4844Variant::TxEip4844WithSidecar(sidecar_tx) => {
+                let max_fee_text = format!("{} gwei", format_gwei(sidecar_tx.tx.max_fee_per_gas));
+                let priority_fee_text = format!("{} gwei", format_gwei(sidecar_tx.tx.max_priority_fee_per_gas));
+                fields.push(SignablePayloadField::TextV2 {
+                    common: SignablePayloadFieldCommon {
+                        fallback_text: max_fee_text.clone(),
+                        label: "Max Fee Per Gas".to_string(),
+                    },
+                    text_v2: SignablePayloadFieldTextV2 {
+                        text: max_fee_text,
+                    },
+                });
+                fields.push(SignablePayloadField::TextV2 {
+                    common: SignablePayloadFieldCommon {
+                        fallback_text: priority_fee_text.clone(),
+                        label: "Max Priority Fee Per Gas".to_string(),
+                    },
+                    text_v2: SignablePayloadFieldTextV2 {
+                        text: priority_fee_text,
+                    },
+                });
+            }
+        },
+        TypedTransaction::Eip7702(tx) => {
+            let max_fee_text = format!("{} gwei", format_gwei(tx.max_fee_per_gas));
+            let priority_fee_text = format!("{} gwei", format_gwei(tx.max_priority_fee_per_gas));
+            fields.push(SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: max_fee_text.clone(),
+                    label: "Max Fee Per Gas".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: max_fee_text,
+                },
+            });
+            fields.push(SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: priority_fee_text.clone(),
+                    label: "Max Priority Fee Per Gas".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: priority_fee_text,
+                },
+            });
+        }
     }
 
     fields.push(SignablePayloadField::TextV2 {
@@ -255,6 +384,38 @@ fn convert_to_visual_sign_payload(
         .transaction_name
         .unwrap_or_else(|| "Ethereum Transaction".to_string());
     SignablePayload::new(0, title, None, fields, "EthereumTx".to_string())
+}
+
+// Helper struct for ERC-20 transfers
+#[derive(Debug)]
+struct Erc20Transfer {
+    recipient: String,
+    amount: String,
+}
+
+fn decode_erc20_transfer(input: &[u8]) -> Option<Erc20Transfer> {
+    if input.len() < 4 {
+        return None;
+    }
+
+    // Try to decode as ERC-20 transfer (direct transfer)
+    if let Ok(call) = IERC20::transferCall::abi_decode(input) {
+        return Some(Erc20Transfer {
+            recipient: format!("{:?}", call.to),
+            amount: call.amount.to_string(),
+        });
+    }
+
+    // Try to decode as ERC-20 transferFrom (delegated transfer)
+    if let Ok(call) = IERC20::transferFromCall::abi_decode(input) {
+        return Some(Erc20Transfer {
+            recipient: format!("{:?}", call.to),
+            amount: call.amount.to_string(),
+            // Note: You might want to also capture the 'from' address for transferFrom
+        });
+    }
+
+    None
 }
 
 // Public API functions for ease of use
