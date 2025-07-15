@@ -6695,9 +6695,9 @@ dependencies = [
 
 [[package]]
 name = "solana-curve25519"
-version = "2.2.16"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fe901fd92d30a1f25a9b2fe76b45171acd8ec1ba920c15c00eb016fcf5a9b11"
+checksum = "10aa190d9f47432e255edd9aaddd21aa78c31be0e639c8463427d0fe5e6919a0"
 dependencies = [
  "bytemuck",
  "bytemuck_derive",
@@ -7457,9 +7457,9 @@ checksum = "61f1bc1357b8188d9c4a3af3fc55276e56987265eb7ad073ae6f8180ee54cecf"
 
 [[package]]
 name = "solana-sdk"
-version = "2.3.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "319ef2bd7269f3da5b338633102c9c0945ec08b2a4c9ac10414848f64660fa7c"
+checksum = "8cc0e4a7635b902791c44b6581bfb82f3ada32c5bc0929a64f39fe4bb384c86a"
 dependencies = [
  "bincode",
  "bs58 0.5.1",
@@ -7874,9 +7874,9 @@ dependencies = [
 
 [[package]]
 name = "solana-transaction-context"
-version = "2.3.0"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5443a368637244a005319c5c9c1fdad1797b040b6bedfb4b143d6995335e4e1"
+checksum = "e6e6d545a650d488b9af4edb1f278f6dabb58189be3d956bc992151b01ac8ab5"
 dependencies = [
  "bincode",
  "serde",
@@ -7887,7 +7887,6 @@ dependencies = [
  "solana-pubkey",
  "solana-rent",
  "solana-sdk-ids",
- "solana-signature",
 ]
 
 [[package]]
@@ -7934,9 +7933,9 @@ dependencies = [
 
 [[package]]
 name = "solana-zk-sdk"
-version = "2.2.16"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8586a9d43b378dee7c64e59784c4c21bdb80f030097c1beed67aa9f9d54acf5b"
+checksum = "1956de8311683b1adef202afee3b49d90d476505db47c979511dc53436cf640c"
 dependencies = [
  "aes-gcm-siv",
  "base64 0.22.1",
@@ -7946,7 +7945,6 @@ dependencies = [
  "curve25519-dalek 4.1.3",
  "itertools 0.12.1",
  "js-sys",
- "lazy_static",
  "merlin",
  "num-derive",
  "num-traits",
@@ -7971,9 +7969,9 @@ dependencies = [
 
 [[package]]
 name = "solana-zk-token-sdk"
-version = "2.2.16"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dc263ade41dfb29c7da0f9c481c8f4b786257999368e555bb1a57180cde0190"
+checksum = "8b5bc8486657eeb34c807ff6b1fcc9c527d61112cf6e3f41fa7282fea51f5de8"
 dependencies = [
  "aes-gcm-siv",
  "base64 0.22.1",
@@ -7982,7 +7980,6 @@ dependencies = [
  "bytemuck_derive",
  "curve25519-dalek 4.1.3",
  "itertools 0.12.1",
- "lazy_static",
  "merlin",
  "num-derive",
  "num-traits",
@@ -9727,9 +9724,9 @@ dependencies = [
  "bincode",
  "borsh 1.5.7",
  "hex",
- "log",
  "solana-program",
  "solana-sdk",
+ "solana-system-interface",
  "solana_parser",
  "spl-associated-token-account",
  "spl-stake-pool",
