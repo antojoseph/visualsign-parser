@@ -11,6 +11,7 @@ use move_bytecode_utils::module_cache::SyncModuleCache;
 use sui_json_rpc_types::{
     SuiTransactionBlockData, SuiTransactionBlockDataAPI, SuiTransactionBlockKind,
 };
+use sui_types::gas_coin::MIST_PER_SUI;
 use sui_types::transaction::{SenderSignedData, TransactionData};
 
 use visualsign::{
@@ -155,7 +156,7 @@ fn create_transfer_preview_layout(transfer: &TransferInfo, index: usize) -> Sign
             "Transfer {}: {} MIST ({} SUI)",
             index,
             transfer.amount,
-            transfer.amount as f64 / 1_000_000_000.0,
+            transfer.amount / MIST_PER_SUI,
         ),
         CoinObject::Unknown(_) => format!("Transfer {}: {} tokens", index, transfer.amount),
     };
