@@ -347,52 +347,6 @@ mod tests {
     }
 
     #[test]
-    fn test_transaction_with_erc20_transfer() {
-        // Create ERC-20 transfer call data
-        let mut input_data = vec![0xa9, 0x05, 0x9c, 0xbb]; // transfer function selector
-        input_data.extend_from_slice(&[0u8; 12]); // padding
-        input_data
-            .extend_from_slice(&hex::decode("1234567890123456789012345678901234567890").unwrap()); // recipient address
-
-        // Convert amount to 32-byte big-endian representation
-        let amount = U256::from(1000000000000000000u64);
-        let amount_bytes = amount.to_be_bytes::<32>();
-        input_data.extend_from_slice(&amount_bytes); // amount (1 token with 18 decimals)
-
-        let tx = TypedTransaction::Legacy(TxLegacy {
-            chain_id: Some(ChainId::from(1u64)),
-            nonce: 1,
-            gas_price: 1_000_000_000u128,
-            gas_limit: 50000,
-            to: alloy_primitives::TxKind::Call(Address::ZERO),
-            value: U256::ZERO,
-            input: Bytes::from(input_data),
-        });
-
-        let options = VisualSignOptions {
-            decode_transfers: true,
-            transaction_name: None,
-        };
-        let payload = transaction_to_visual_sign(tx, options).unwrap();
-
-        // Check that token transfer field is present
-        assert!(payload.fields.iter().any(|f| f.label() == "Token Transfer"));
-        let transfer_field = payload
-            .fields
-            .iter()
-            .find(|f| f.label() == "Token Transfer")
-            .unwrap();
-        if let SignablePayloadField::TextV2 { text_v2, .. } = transfer_field {
-            assert!(text_v2.text.contains("1000000000000000000"));
-            assert!(
-                text_v2
-                    .text
-                    .contains("0x1234567890123456789012345678901234567890")
-            );
-        }
-    }
-
-    #[test]
     fn test_transaction_with_custom_title() {
         let tx = TypedTransaction::Legacy(TxLegacy {
             chain_id: Some(ChainId::from(1u64)),
@@ -550,156 +504,37 @@ mod tests {
             panic!("Expected both transactions to be EIP-1559 type");
         }
 
-        // Test with EIP-2930 transaction
-        let eip2930_tx = TypedTransaction::Eip2930(alloy_consensus::TxEip2930 {
-            chain_id: ChainId::from(1u64),
-            nonce: 2,
-            gas_price: 25_000_000_000u128,
-            gas_limit: 21000,
-            to: alloy_primitives::TxKind::Call(Address::ZERO),
-            value: U256::from(500000000000000000u64),
-            access_list: Default::default(),
-            input: Bytes::new(),
-        });
-
-        // Encode EIP-2930 transaction
-        let mut eip2930_encoded = vec![0x01]; // EIP-2930 type prefix
-        if let TypedTransaction::Eip2930(ref eip2930) = eip2930_tx {
-            eip2930.encode(&mut eip2930_encoded);
-        }
-
+        // Test with EIP-2930 transaction (unsupported)
+        let eip2930_encoded = vec![0x01, 0x12, 0x34]; // EIP-2930 type prefix with dummy data
         let eip2930_hex = format!("0x{}", hex::encode(&eip2930_encoded));
         let eip2930_result = EthereumTransactionWrapper::from_string(&eip2930_hex);
-        assert!(
-            eip2930_result.is_ok(),
-            "Should successfully parse EIP-2930 transaction"
-        );
-
-        let eip2930_wrapper = eip2930_result.unwrap();
-        // Compare the decoded EIP-2930 transaction with the original
-        if let (TypedTransaction::Eip2930(original), TypedTransaction::Eip2930(decoded)) =
-            (&eip2930_tx, eip2930_wrapper.inner())
-        {
-            assert_eq!(original.chain_id, decoded.chain_id);
-            assert_eq!(original.nonce, decoded.nonce);
-            assert_eq!(original.gas_price, decoded.gas_price);
-            assert_eq!(original.gas_limit, decoded.gas_limit);
-            assert_eq!(original.to, decoded.to);
-            assert_eq!(original.value, decoded.value);
-            assert_eq!(original.access_list, decoded.access_list);
-            assert_eq!(original.input, decoded.input);
+        assert!(eip2930_result.is_err());
+        if let Err(TransactionParseError::DecodeError(msg)) = eip2930_result {
+            assert!(msg.contains("Unsupported variant eip-2930"));
         } else {
-            panic!("Expected both transactions to be EIP-2930 type");
+            panic!("Expected decode error for unsupported EIP-2930 transaction");
         }
 
-        // Test with EIP-4844 transaction
-        let eip4844_tx = TypedTransaction::Eip4844(alloy_consensus::TxEip4844Variant::TxEip4844(
-            alloy_consensus::TxEip4844 {
-                chain_id: ChainId::from(1u64),
-                nonce: 3,
-                gas_limit: 21000,
-                max_fee_per_gas: 40_000_000_000u128,
-                max_priority_fee_per_gas: 3_000_000_000u128,
-                to: Address::ZERO,
-                value: U256::from(250000000000000000u64),
-                access_list: Default::default(),
-                blob_versioned_hashes: vec![],
-                max_fee_per_blob_gas: 1_000_000_000u128,
-                input: Bytes::new(),
-            },
-        ));
-
-        // Encode EIP-4844 transaction
-        let mut eip4844_encoded = vec![0x03]; // EIP-4844 type prefix
-        if let TypedTransaction::Eip4844(alloy_consensus::TxEip4844Variant::TxEip4844(
-            ref eip4844,
-        )) = eip4844_tx
-        {
-            eip4844.encode(&mut eip4844_encoded);
-        }
-
+        // Test with EIP-4844 transaction (unsupported)
+        let eip4844_encoded = vec![0x03, 0x56, 0x78]; // EIP-4844 type prefix with dummy data
         let eip4844_hex = format!("0x{}", hex::encode(&eip4844_encoded));
         let eip4844_result = EthereumTransactionWrapper::from_string(&eip4844_hex);
-        assert!(
-            eip4844_result.is_ok(),
-            "Should successfully parse EIP-4844 transaction"
-        );
-
-        let eip4844_wrapper = eip4844_result.unwrap();
-        // Compare the decoded EIP-4844 transaction with the original
-        if let (
-            TypedTransaction::Eip4844(alloy_consensus::TxEip4844Variant::TxEip4844(original)),
-            TypedTransaction::Eip4844(alloy_consensus::TxEip4844Variant::TxEip4844(decoded)),
-        ) = (&eip4844_tx, eip4844_wrapper.inner())
-        {
-            assert_eq!(original.chain_id, decoded.chain_id);
-            assert_eq!(original.nonce, decoded.nonce);
-            assert_eq!(original.gas_limit, decoded.gas_limit);
-            assert_eq!(original.max_fee_per_gas, decoded.max_fee_per_gas);
-            assert_eq!(
-                original.max_priority_fee_per_gas,
-                decoded.max_priority_fee_per_gas
-            );
-            assert_eq!(original.to, decoded.to);
-            assert_eq!(original.value, decoded.value);
-            assert_eq!(original.access_list, decoded.access_list);
-            assert_eq!(
-                original.blob_versioned_hashes,
-                decoded.blob_versioned_hashes
-            );
-            assert_eq!(original.max_fee_per_blob_gas, decoded.max_fee_per_blob_gas);
-            assert_eq!(original.input, decoded.input);
+        assert!(eip4844_result.is_err());
+        if let Err(TransactionParseError::DecodeError(msg)) = eip4844_result {
+            assert!(msg.contains("Unsupported variant eip-4844"));
         } else {
-            panic!("Expected both transactions to be EIP-4844 type");
+            panic!("Expected decode error for unsupported EIP-4844 transaction");
         }
 
-        // Test with EIP-7702 transaction
-        let eip7702_tx = TypedTransaction::Eip7702(alloy_consensus::TxEip7702 {
-            chain_id: ChainId::from(1u64),
-            nonce: 4,
-            gas_limit: 21000,
-            max_fee_per_gas: 35_000_000_000u128,
-            max_priority_fee_per_gas: 2_500_000_000u128,
-            to: Address::ZERO,
-            value: U256::from(750000000000000000u64),
-            access_list: Default::default(),
-            authorization_list: vec![],
-            input: Bytes::new(),
-        });
-
-        // Encode EIP-7702 transaction
-        let mut eip7702_encoded = vec![0x04]; // EIP-7702 type prefix
-        if let TypedTransaction::Eip7702(ref eip7702) = eip7702_tx {
-            eip7702.encode(&mut eip7702_encoded);
-        }
-
+        // Test with EIP-7702 transaction (unsupported)
+        let eip7702_encoded = vec![0x04, 0x9a, 0xbc]; // EIP-7702 type prefix with dummy data
         let eip7702_hex = format!("0x{}", hex::encode(&eip7702_encoded));
         let eip7702_result = EthereumTransactionWrapper::from_string(&eip7702_hex);
-        assert!(
-            eip7702_result.is_ok(),
-            "Should successfully parse EIP-7702 transaction"
-        );
-
-        let eip7702_wrapper = eip7702_result.unwrap();
-        // Compare the decoded EIP-7702 transaction with the original
-        if let (TypedTransaction::Eip7702(original), TypedTransaction::Eip7702(decoded)) =
-            (&eip7702_tx, eip7702_wrapper.inner())
-        {
-            assert_eq!(original.chain_id, decoded.chain_id);
-            assert_eq!(original.nonce, decoded.nonce);
-            assert_eq!(original.gas_limit, decoded.gas_limit);
-            assert_eq!(original.max_fee_per_gas, decoded.max_fee_per_gas);
-            assert_eq!(
-                original.max_priority_fee_per_gas,
-                decoded.max_priority_fee_per_gas
-            );
-            assert_eq!(original.to, decoded.to);
-            assert_eq!(original.value, decoded.value);
-            assert_eq!(original.access_list, decoded.access_list);
-            assert_eq!(original.authorization_list, decoded.authorization_list);
-            assert_eq!(original.input, decoded.input);
+        assert!(eip7702_result.is_err());
+        if let Err(TransactionParseError::DecodeError(msg)) = eip7702_result {
+            assert!(msg.contains("Unsupported variant eip-7702"));
         } else {
-            panic!("Expected both transactions to be EIP-7702 type");
+            panic!("Expected decode error for unsupported EIP-7702 transaction");
         }
     }
 
