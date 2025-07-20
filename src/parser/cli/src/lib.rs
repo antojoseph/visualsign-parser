@@ -4,16 +4,7 @@
 #![warn(missing_docs, clippy::pedantic)]
 #![allow(clippy::missing_errors_doc, clippy::module_name_repetitions)]
 
+/// Chain-related functionality and types.
+pub mod chains;
+/// Command-line interface functionality and types.
 pub mod cli;
-
-pub mod service;
-
-pub mod errors;
-
-pub mod chain_conversion;
-
-pub mod registry;
-
-mod routes {
-    pub(crate) mod parse;
-}
