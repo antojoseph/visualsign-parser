@@ -11,9 +11,18 @@ use visualsign::{
     },
 };
 
+pub mod chains;
+fn trim_trailing_zeros(s: String) -> String {
+    if s.contains('.') {
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    } else {
+        s.to_string()
+    }
+}
+
 // Helper function to format wei to ether
 fn format_ether(wei: U256) -> String {
-    format_units(wei, 18).unwrap_or_else(|_| wei.to_string())
+    trim_trailing_zeros(format_units(wei, 18).unwrap_or_else(|_| wei.to_string()))
 }
 
 /// Wrapper around Alloy's transaction type that implements the Transaction trait
@@ -127,15 +136,31 @@ fn convert_to_visual_sign_payload(
     transaction: TypedTransaction,
     options: VisualSignOptions,
 ) -> SignablePayload {
+    // Extract chain ID to determine the network
+    let chain_id = match &transaction {
+        TypedTransaction::Legacy(tx) => tx.chain_id.map(|id| id as u64),
+        TypedTransaction::Eip2930(tx) => Some(tx.chain_id as u64),
+        TypedTransaction::Eip1559(tx) => Some(tx.chain_id as u64),
+        TypedTransaction::Eip4844(tx) => match tx {
+            alloy_consensus::TxEip4844Variant::TxEip4844(inner_tx) => {
+                Some(inner_tx.chain_id as u64)
+            }
+            alloy_consensus::TxEip4844Variant::TxEip4844WithSidecar(sidecar_tx) => {
+                Some(sidecar_tx.tx.chain_id as u64)
+            }
+        },
+        TypedTransaction::Eip7702(tx) => Some(tx.chain_id as u64),
+    };
+
+    let chain_name = chains::get_chain_name(chain_id);
+
     let mut fields = vec![
         SignablePayloadField::TextV2 {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Ethereum".to_string(),
+                fallback_text: chain_name.clone(),
                 label: "Network".to_string(),
             },
-            text_v2: SignablePayloadFieldTextV2 {
-                text: "Ethereum".to_string(),
-            },
+            text_v2: SignablePayloadFieldTextV2 { text: chain_name },
         },
         SignablePayloadField::TextV2 {
             common: SignablePayloadFieldCommon {
