@@ -1,6 +1,7 @@
 use crate::commands::{CoinObject, TransferInfo, detect_transfer_from_transaction};
 use crate::field_helpers::{
-    create_address_field, create_amount_field, create_simple_text_field, create_text_field,
+    create_address_field, create_amount_field, create_raw_data_field, create_simple_text_field,
+    create_text_field,
 };
 use crate::module_resolver::SuiModuleResolver;
 
@@ -27,7 +28,7 @@ use visualsign::{
 /// Wrapper around Sui's transaction type that implements the Transaction trait
 #[derive(Debug, Clone)]
 pub struct SuiTransactionWrapper {
-    transaction: SuiTransactionBlockData,
+    transaction: TransactionData,
 }
 
 impl Transaction for SuiTransactionWrapper {
@@ -47,12 +48,12 @@ impl Transaction for SuiTransactionWrapper {
 
 impl SuiTransactionWrapper {
     /// Create a new SuiTransactionWrapper
-    pub fn new(transaction: SuiTransactionBlockData) -> Self {
+    pub fn new(transaction: TransactionData) -> Self {
         Self { transaction }
     }
 
     /// Get a reference to the inner transaction
-    pub fn inner(&self) -> &SuiTransactionBlockData {
+    pub fn inner(&self) -> &TransactionData {
         &self.transaction
     }
 }
@@ -68,13 +69,11 @@ impl VisualSignConverter<SuiTransactionWrapper> for SuiVisualSignConverter {
     ) -> Result<SignablePayload, VisualSignError> {
         let transaction = transaction_wrapper.inner();
 
-        let payload = convert_to_visual_sign_payload(
+        convert_to_visual_sign_payload(
             transaction,
             options.decode_transfers,
             options.transaction_name,
-        );
-
-        Ok(payload)
+        )
     }
 }
 
@@ -84,7 +83,7 @@ impl VisualSignConverterFromString<SuiTransactionWrapper> for SuiVisualSignConve
 pub(crate) fn decode_transaction(
     raw_transaction: &str,
     encodings: SupportedEncodings,
-) -> Result<SuiTransactionBlockData, Box<dyn std::error::Error>> {
+) -> Result<TransactionData, Box<dyn std::error::Error>> {
     if raw_transaction.is_empty() {
         return Err("Transaction is empty".into());
     }
@@ -97,17 +96,11 @@ pub(crate) fn decode_transaction(
     };
 
     if let Ok(sender_signed_data) = bcs::from_bytes::<SenderSignedData>(&bytes) {
-        return Ok(SuiTransactionBlockData::try_from_with_module_cache(
-            sender_signed_data.transaction_data().clone(),
-            &SyncModuleCache::new(SuiModuleResolver),
-        )?);
+        return Ok(sender_signed_data.transaction_data().clone());
     }
 
     if let Ok(transaction_data) = bcs::from_bytes::<TransactionData>(&bytes) {
-        return Ok(SuiTransactionBlockData::try_from_with_module_cache(
-            transaction_data,
-            &SyncModuleCache::new(SuiModuleResolver),
-        )?);
+        return Ok(transaction_data);
     }
 
     Err("Unable to decode transaction data as either SenderSignedData or TransactionData".into())
@@ -115,20 +108,32 @@ pub(crate) fn decode_transaction(
 
 /// Convert Sui transaction to visual sign payload
 fn convert_to_visual_sign_payload(
-    transaction: &SuiTransactionBlockData,
+    transaction: &TransactionData,
     decode_transfers: bool,
     title: Option<String>,
-) -> SignablePayload {
+) -> Result<SignablePayload, VisualSignError> {
+    let block_data = SuiTransactionBlockData::try_from_with_module_cache(
+        transaction.clone(),
+        &SyncModuleCache::new(SuiModuleResolver),
+    )
+    .map_err(|e| VisualSignError::ParseError(TransactionParseError::DecodeError(e.to_string())))?;
+
     let mut fields = vec![create_simple_text_field("Network", "Sui Network")];
 
     if decode_transfers {
-        add_transfer_preview_layouts(&mut fields, transaction);
+        add_transfer_preview_layouts(&mut fields, &block_data);
     }
 
-    add_transaction_details_preview_layout(&mut fields, transaction);
+    add_transaction_details_preview_layout(&mut fields, transaction, &block_data);
 
-    let title = title.unwrap_or_else(|| determine_transaction_type_string(transaction));
-    SignablePayload::new(0, title, None, fields, "Sui".to_string())
+    let title = title.unwrap_or_else(|| determine_transaction_type_string(&block_data));
+    Ok(SignablePayload::new(
+        0,
+        title,
+        None,
+        fields,
+        "Sui".to_string(),
+    ))
 }
 
 /// Add transfer information using preview layout
@@ -231,21 +236,29 @@ fn create_transfer_expanded_fields(transfer: &TransferInfo) -> Vec<AnnotatedPayl
 /// Add transaction details using preview layout
 fn add_transaction_details_preview_layout(
     fields: &mut Vec<SignablePayloadField>,
-    tx_data: &SuiTransactionBlockData,
+    tx_data: &TransactionData,
+    block_data: &SuiTransactionBlockData,
 ) {
     let title_text = "Transaction Details";
-    let subtitle_text = format!("Gas: {} MIST", tx_data.gas_data().budget);
+    let subtitle_text = format!("Gas: {} MIST", block_data.gas_data().budget);
 
     let condensed = SignablePayloadFieldListLayout {
         fields: vec![
-            create_text_field("Type", &determine_transaction_type_string(tx_data)),
-            create_text_field("Gas Budget", &format!("{} MIST", tx_data.gas_data().budget)),
+            create_text_field("Type", &determine_transaction_type_string(&block_data)),
+            create_text_field(
+                "Gas Budget",
+                &format!("{} MIST", block_data.gas_data().budget),
+            ),
         ],
     };
 
-    let expanded = SignablePayloadFieldListLayout {
-        fields: create_transaction_expanded_fields(tx_data),
+    let mut expanded = SignablePayloadFieldListLayout {
+        fields: create_transaction_expanded_fields(block_data),
     };
+
+    if let Ok(encoded) = bcs::to_bytes::<TransactionData>(tx_data) {
+        expanded.fields.push(create_raw_data_field(&encoded));
+    }
 
     let preview_layout = SignablePayloadFieldPreviewLayout {
         title: Some(SignablePayloadFieldTextV2 {
@@ -329,7 +342,7 @@ fn truncate_address(address: &str) -> String {
 
 /// Public API function for ease of use
 pub fn transaction_to_visual_sign(
-    transaction: SuiTransactionBlockData,
+    transaction: TransactionData,
     options: VisualSignOptions,
 ) -> Result<SignablePayload, VisualSignError> {
     SuiVisualSignConverter.to_visual_sign_payload(SuiTransactionWrapper::new(transaction), options)

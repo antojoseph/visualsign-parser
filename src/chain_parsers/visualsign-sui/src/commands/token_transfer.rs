@@ -211,14 +211,21 @@ mod tests {
     use crate::visualsign::decode_transaction;
 
     use std::str::FromStr;
+    use move_bytecode_utils::module_cache::SyncModuleCache;
     use visualsign::encodings::SupportedEncodings;
+    
+    use crate::module_resolver::SuiModuleResolver;
 
     #[test]
     fn test_detect_native_transfer() -> anyhow::Result<()> {
         let test_data = "AQAAAAAAAgAI6AMAAAAAAAAAIKHjrlUcKr48a86iLT8ZNWpkcIbWvVasDQnk7u0GKQt2AgIAAQEAAAEBAgAAAQEA1ukuAC4mw6+yCIABwbWCC2TyvDUb/aWiNCrL+fXBysIBy0he+AoLr5B5piHELIsMtlzpmG4cgf0W7ogDjwBKWu3zD9AUAAAAACB0zCGEALsfD5u98y58qbKGIiXkCtDxxN2Pu+r/HyOy1tbpLgAuJsOvsgiAAcG1ggtk8rw1G/2lojQqy/n1wcrC6AMAAAAAAABAS0wAAAAAAAABYQBMegviWYFsLskcYMnTIhZRxiZkET3j2RqtgG1g7f1/EuPjfCHfTvgDqVys+AA6jLWojR35eW4HoOh8qURdshkADNDs6YjOg+HDmdMLe0zMuMDJKqzwIYg08CT6mXiLc2Y=";
 
         let result = decode_transaction(test_data, SupportedEncodings::Base64).unwrap();
-        let result = detect_transfer_from_transaction(&result);
+        let block_data = SuiTransactionBlockData::try_from_with_module_cache(
+            result.clone(),
+            &SyncModuleCache::new(SuiModuleResolver),
+        )?;
+        let result = detect_transfer_from_transaction(&block_data);
 
         assert_eq!(result.len(), 1);
 
@@ -240,7 +247,11 @@ mod tests {
         let test_data = "AQAAAAAABAAgoeOuVRwqvjxrzqItPxk1amRwhta9VqwNCeTu7QYpC3YBAMIA6wRHwZnY1Uq4kShmJ9MzSf09cido4hRbib9QxPr6GprUFwAAAAAgaLIB/QqiGeVY7g/t0gmAgBUq5KN1vBtUCNfQl+OWI4QACBAnAAAAAAAAAAggTgAAAAAAAAQCAQEAAQEDAAEBAgAAAQAAAgEBAAEBAgABAQICAAEAANbpLgAuJsOvsgiAAcG1ggtk8rw1G/2lojQqy/n1wcrCActIXvgKC6+QeaYhxCyLDLZc6ZhuHIH9Fu6IA48ASlrtGprUFwAAAAAgruP9lGIbTNb4l4WPdDGN2qrKMg4H7WiVr4iK3KnMEI/W6S4ALibDr7IIgAHBtYILZPK8NRv9paI0Ksv59cHKwugDAAAAAAAAQEtMAAAAAAAAAWEAmEURyDG9UG5JOixWeOweSlyhULQ2oNgiAUrKrio+mjI8yelPjyw5AFA8WOgv9T/RytUNWfnqKsStA67qnisQAwzQ7OmIzoPhw5nTC3tMzLjAySqs8CGINPAk+pl4i3Nm";
 
         let result = decode_transaction(test_data, SupportedEncodings::Base64).unwrap();
-        let result = detect_transfer_from_transaction(&result);
+        let block_data = SuiTransactionBlockData::try_from_with_module_cache(
+            result.clone(),
+            &SyncModuleCache::new(SuiModuleResolver),
+        )?;
+        let result = detect_transfer_from_transaction(&block_data);
 
         assert_eq!(result.len(), 1);
 

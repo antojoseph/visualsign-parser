@@ -1,3 +1,5 @@
+use base64::Engine;
+
 use visualsign::{
     AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldAddressV2,
     SignablePayloadFieldAmountV2, SignablePayloadFieldCommon, SignablePayloadFieldTextV2,
@@ -76,5 +78,22 @@ pub fn create_simple_text_field(label: &str, text: &str) -> SignablePayloadField
         text_v2: SignablePayloadFieldTextV2 {
             text: text.to_string(),
         },
+    }
+}
+
+/// Create a standard Raw Data field for expanded views
+pub fn create_raw_data_field(data: &[u8]) -> AnnotatedPayloadField {
+    AnnotatedPayloadField {
+        signable_payload_field: SignablePayloadField::TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "The raw instruction data in base64 format".to_string(),
+                label: "Raw Data".to_string(),
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: base64::engine::general_purpose::STANDARD.encode(data),
+            },
+        },
+        static_annotation: None,
+        dynamic_annotation: None,
     }
 }
