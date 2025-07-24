@@ -9,25 +9,24 @@ fn parse_and_display(chain: &str, raw_tx: &str, options: VisualSignOptions, outp
 
     let registry = create_registry();
     let signable_payload_str = registry.convert_transaction(&registry_chain, raw_tx, options);
-
-    match output_format {
-        "json" => match &signable_payload_str {
-            Ok(payload) => {
-                if let Ok(json_output) = serde_json::to_string_pretty(payload) {
+    match signable_payload_str {
+        Ok(payload) => match output_format {
+            "json" => {
+                if let Ok(json_output) = serde_json::to_string_pretty(&payload) {
                     println!("{json_output}");
                 } else {
                     eprintln!("Error: Failed to serialize output as JSON");
                 }
             }
-            Err(err) => {
-                eprintln!("Error: {err:?}");
+            "text" => {
+                println!("{payload:#?}");
+            }
+            _ => {
+                eprintln!("Error: Unsupported output format '{output_format}'");
             }
         },
-        "text" => {
-            println!("{signable_payload_str:#?}");
-        }
-        _ => {
-            eprintln!("Error: Unsupported output format '{output_format}'");
+        Err(err) => {
+            eprintln!("Error: {err:?}");
         }
     }
 }
