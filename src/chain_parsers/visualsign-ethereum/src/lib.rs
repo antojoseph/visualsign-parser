@@ -41,7 +41,7 @@ fn format_ether(wei: U256) -> String {
 
 // Helper function to format wei to gwei
 fn format_gwei<T: Into<alloy_primitives::U256> + ToString + Copy>(wei: T) -> String {
-    format_units(wei, 9).unwrap_or_else(|_| wei.to_string())
+    format_units(wei, "gwei").unwrap_or_else(|_| wei.to_string())
 }
 
 sol! {
