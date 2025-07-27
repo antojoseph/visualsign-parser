@@ -653,18 +653,78 @@ mod tests {
     #[test]
     fn test_transaction_to_visual_sign_public_api() {
         // Test the public API function
-        let test_tx = "0xf86c808504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83";
-        let options = VisualSignOptions::default();
-        let tx = EthereumTransactionWrapper::from_string(test_tx).unwrap();
-
-        match transaction_to_visual_sign(tx.inner().clone(), options) {
-            Ok(payload) => {
-                assert_eq!(payload.title, "Ethereum Transaction");
-            }
-            Err(e) => {
-                eprintln!("Public API failed with error: {:?}", e);
-                panic!("Public API should work but got error: {:?}", e);
-            }
-        }
+        let tx = TypedTransaction::Eip1559(alloy_consensus::TxEip1559 {
+            chain_id: ChainId::from(1u64),
+            nonce: 1,
+            gas_limit: 21000,
+            max_fee_per_gas: 30_000_000_000u128,
+            max_priority_fee_per_gas: 2_000_000_000u128,
+            to: alloy_primitives::TxKind::Call(Address::ZERO),
+            value: U256::from(1000000000000000000u64),
+            access_list: Default::default(),
+            input: Bytes::new(),
+        });
+        assert_eq!(
+            transaction_string_to_visual_sign(
+                &unsigned_to_hex(&tx),
+                VisualSignOptions {
+                    decode_transfers: true,
+                    transaction_name: Some("Test Transaction".to_string()),
+                }
+            ),
+            Ok(SignablePayload::new(
+                0,
+                "Test Transaction".to_string(),
+                None,
+                vec![
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "Ethereum Mainnet".to_string(),
+                            label: "Network".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "Ethereum Mainnet".to_string(),
+                        },
+                    },
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "0x0000000000000000000000000000000000000000".to_string(),
+                            label: "To".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "0x0000000000000000000000000000000000000000".to_string(),
+                        },
+                    },
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "1 ETH".to_string(),
+                            label: "Value".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "1 ETH".to_string(),
+                        },
+                    },
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "21000".to_string(),
+                            label: "Gas Limit".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "21000".to_string(),
+                        },
+                    },
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "1".to_string(),
+                            label: "Nonce".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "1".to_string(),
+                        },
+                    },
+                ],
+                "EthereumTx".to_string()
+            ))
+        );
     }
 }
