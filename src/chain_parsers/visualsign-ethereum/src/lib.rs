@@ -12,6 +12,19 @@ use visualsign::{
 };
 
 pub mod chains;
+
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
+pub enum EthereumParserError {
+    #[error("Unexpected trailing data: {0}")]
+    UnexpectedTrailingData(String),
+    #[error("Unexpected transaction type: {0}")]
+    UnexpectedTransactionType(String),
+    #[error("Unsupported transaction type: {0}")]
+    UnsupportedTransactionType(String),
+    #[error("Failed to decode transaction: {0}")]
+    FailedToDecodeTransaction(String),
+}
+
 fn trim_trailing_zeros(s: String) -> String {
     if s.contains('.') {
         s.trim_end_matches('0').trim_end_matches('.').to_string()
@@ -81,42 +94,53 @@ impl VisualSignConverter<EthereumTransactionWrapper> for EthereumVisualSignConve
 }
 
 impl VisualSignConverterFromString<EthereumTransactionWrapper> for EthereumVisualSignConverter {}
-fn decode_transaction_bytes(
-    mut buf: &[u8],
-) -> Result<TypedTransaction, Box<dyn std::error::Error>> {
+fn decode_transaction_bytes(mut buf: &[u8]) -> Result<TypedTransaction, EthereumParserError> {
     let tx = if buf.is_empty() {
-        Err("Failed to decode transaction: input too short".into())
+        Err(EthereumParserError::FailedToDecodeTransaction(
+            "Input too short".to_string(),
+        ))
     } else if buf[0] == 0 || (buf[0] > 0x7f && buf[0] < 0xc0) {
-        Err(format!(
-            "Failed to decode transaction: unexpected tx type {}",
+        Err(EthereumParserError::FailedToDecodeTransaction(format!(
+            "Unexpected type flag {}.",
             buf[0]
-        )
-        .into())
+        )))
     } else if buf[0] <= 0x7f {
-        let ty = buf[0]
-            .try_into()
-            .map_err(|e| format!("Failed to decode transaction: {e}"))?;
+        let ty: TxType = match buf[0].try_into() {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(EthereumParserError::FailedToDecodeTransaction(
+                    e.to_string(),
+                ));
+            }
+        };
         buf.advance(1); // Skip type byte
         match ty {
             TxType::Eip1559 => Ok(TypedTransaction::Eip1559(
                 alloy_consensus::TxEip1559::decode(&mut buf)
-                    .map_err(|e| format!("Failed to decode transaction: {}", e))?,
+                    .map_err(|e| EthereumParserError::FailedToDecodeTransaction(e.to_string()))?,
             )),
-            TxType::Eip2930 => Err("Unsupported variant eip-2930".into()),
-            TxType::Eip4844 => Err("Unsupported variant eip-4844".into()),
-            TxType::Eip7702 => Err("Unsupported variant eip-7702".into()),
-            TxType::Legacy => Err("Unexpected legacy variant".into()),
+            TxType::Eip2930 => Err(EthereumParserError::UnsupportedTransactionType(
+                "eip-2930".to_string(),
+            )),
+            TxType::Eip4844 => Err(EthereumParserError::UnsupportedTransactionType(
+                "eip-4844".to_string(),
+            )),
+            TxType::Eip7702 => Err(EthereumParserError::UnsupportedTransactionType(
+                "eip-7702".to_string(),
+            )),
+            TxType::Legacy => Err(EthereumParserError::UnexpectedTransactionType(
+                "legacy".to_string(), // This shouldn't happen
+            )),
         }
     } else {
         Ok(TypedTransaction::Legacy(
             alloy_consensus::TxLegacy::decode(&mut buf)
-                .map_err(|e| format!("Failed to decode transaction: {}", e))?,
+                .map_err(|e| EthereumParserError::FailedToDecodeTransaction(e.to_string()))?,
         ))
     };
     if tx.is_ok() && !buf.is_empty() {
-        return Err(Box::<dyn std::error::Error>::from(format!(
-            "Unexpected trailing data after transaction: {}",
-            hex::encode(buf)
+        return Err(EthereumParserError::UnexpectedTrailingData(hex::encode(
+            buf,
         )));
     }
     tx
@@ -125,17 +149,25 @@ fn decode_transaction_bytes(
 fn decode_transaction(
     raw_transaction: &str,
     encodings: SupportedEncodings,
-) -> Result<TypedTransaction, Box<dyn std::error::Error>> {
+) -> Result<TypedTransaction, EthereumParserError> {
     let bytes = match encodings {
         SupportedEncodings::Hex => {
             let clean_hex = raw_transaction
                 .strip_prefix("0x")
                 .unwrap_or(raw_transaction);
-            hex::decode(clean_hex).map_err(|e| format!("Failed to decode hex: {}", e))?
+            hex::decode(clean_hex).map_err(|e| {
+                EthereumParserError::FailedToDecodeTransaction(format!(
+                    "Failed to decode hex: {}",
+                    e
+                ))
+            })?
         }
-        SupportedEncodings::Base64 => b64
-            .decode(raw_transaction)
-            .map_err(|e| format!("Failed to decode base64: {}", e))?,
+        SupportedEncodings::Base64 => b64.decode(raw_transaction).map_err(|e| {
+            EthereumParserError::FailedToDecodeTransaction(format!(
+                "Failed to decode base64: {}",
+                e
+            ))
+        })?,
     };
     decode_transaction_bytes(&bytes)
 }
@@ -425,21 +457,22 @@ mod tests {
         assert_eq!(
             EthereumTransactionWrapper::from_string(""),
             Err(TransactionParseError::DecodeError(
-                "Failed to decode transaction: input too short".to_string()
+                "Failed to decode transaction: Input too short".to_string()
             )),
         );
         // Test with invalid hex data
         assert_eq!(
             EthereumTransactionWrapper::from_string("invalid_hex_data"),
             Err(TransactionParseError::DecodeError(
-                "Failed to decode base64: Invalid symbol 95, offset 7".to_string()
+                "Failed to decode transaction: Failed to decode base64: Invalid symbol 95, offset 7.".to_string()
             )),
         );
         // Test with malformed hex (odd length)
         assert_eq!(
             EthereumTransactionWrapper::from_string("0x123"),
             Err(TransactionParseError::DecodeError(
-                "Failed to decode hex: Odd number of digits".to_string()
+                "Failed to decode transaction: Failed to decode hex: Odd number of digits"
+                    .to_string()
             )),
         );
         // Test with valid hex prefix but invalid RLP data
@@ -483,7 +516,7 @@ mod tests {
         assert_eq!(
             EthereumTransactionWrapper::from_string(" 0x1234 "),
             Err(TransactionParseError::DecodeError(
-                "Failed to decode base64: Invalid symbol 32, offset 0.".to_string()
+                "Failed to decode transaction: Failed to decode base64: Invalid symbol 32, offset 0.".to_string()
             )),
         );
         // Test with legacy transaction
@@ -530,7 +563,7 @@ mod tests {
         assert_eq!(
             EthereumTransactionWrapper::from_string(&unsigned_to_hex(&eip2930_tx)),
             Err(TransactionParseError::DecodeError(
-                "Unsupported variant eip-2930".to_string()
+                "Unsupported transaction type: eip-2930".to_string()
             ))
         );
         // Test with EIP-4844 transaction (unsupported)
@@ -552,7 +585,7 @@ mod tests {
         assert_eq!(
             EthereumTransactionWrapper::from_string(&unsigned_to_hex(&eip4844_tx)),
             Err(TransactionParseError::DecodeError(
-                "Unsupported variant eip-4844".to_string()
+                "Unsupported transaction type: eip-4844".to_string()
             ))
         );
         // Test with EIP-7702 transaction (unsupported)
@@ -571,7 +604,7 @@ mod tests {
         assert_eq!(
             EthereumTransactionWrapper::from_string(&unsigned_to_hex(&eip7702_tx)),
             Err(TransactionParseError::DecodeError(
-                "Unsupported variant eip-7702".to_string()
+                "Unsupported transaction type: eip-7702".to_string()
             ))
         );
     }
