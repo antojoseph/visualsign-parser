@@ -281,6 +281,7 @@ fn convert_to_visual_sign_payload(
     // Add contract call data if present
     let input = transaction.input();
     if !input.is_empty() {
+        let mut input_fields: Vec<SignablePayloadField> = Vec::new();
         if options.decode_transfers {
             let mut erc20_fields = contracts::erc20::parse_erc20_transfer(input);
             let mut uniswap_fields = contracts::uniswap::parse_universal_router_execute(input);
@@ -311,6 +312,7 @@ fn convert_to_visual_sign_payload(
                 },
             });
         }
+        fields.append(&mut input_fields);
     }
 
     let title = options

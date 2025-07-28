@@ -157,12 +157,9 @@ struct UniversalRouterExecute {
 
 fn decode_universal_router_execute(input: &[u8]) -> Option<UniversalRouterExecute> {
     if input.len() < 4 {
-        println!("Input too short for Universal Router execute call");
         return None;
     }
-
     if let Ok(call) = IUniversalRouter::executeCall::abi_decode(input) {
-        println!("Decoded Universal Router execute call");
         let deadline = Utc
             .timestamp_opt(call.deadline.try_into().ok()?, 0)
             .unwrap();
@@ -171,7 +168,6 @@ fn decode_universal_router_execute(input: &[u8]) -> Option<UniversalRouterExecut
             deadline: deadline.to_string(),
         })
     } else {
-        println!("Failed to decode Universal Router execute call");
         None
     }
 }
