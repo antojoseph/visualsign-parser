@@ -1,6 +1,6 @@
-use alloy_consensus::{Transaction as _, TypedTransaction};
+use alloy_consensus::{Transaction as _, TxType, TypedTransaction};
 use alloy_primitives::{U256, utils::format_units};
-use alloy_rlp::Decodable;
+use alloy_rlp::{Buf, Decodable};
 use base64::{Engine as _, engine::general_purpose::STANDARD as b64};
 use visualsign::{
     SignablePayload, SignablePayloadField, SignablePayloadFieldCommon, SignablePayloadFieldTextV2,
@@ -12,6 +12,19 @@ use visualsign::{
 };
 
 pub mod chains;
+
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
+pub enum EthereumParserError {
+    #[error("Unexpected trailing data: {0}")]
+    UnexpectedTrailingData(String),
+    #[error("Unexpected transaction type: {0}")]
+    UnexpectedTransactionType(String),
+    #[error("Unsupported transaction type: {0}")]
+    UnsupportedTransactionType(String),
+    #[error("Failed to decode transaction: {0}")]
+    FailedToDecodeTransaction(String),
+}
+
 fn trim_trailing_zeros(s: String) -> String {
     if s.contains('.') {
         s.trim_end_matches('0').trim_end_matches('.').to_string()
@@ -26,7 +39,7 @@ fn format_ether(wei: U256) -> String {
 }
 
 /// Wrapper around Alloy's transaction type that implements the Transaction trait
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct EthereumTransactionWrapper {
     transaction: TypedTransaction,
 }
@@ -66,70 +79,97 @@ impl VisualSignConverter<EthereumTransactionWrapper> for EthereumVisualSignConve
         options: VisualSignOptions,
     ) -> Result<SignablePayload, VisualSignError> {
         let transaction = transaction_wrapper.inner().clone();
-        let payload = convert_to_visual_sign_payload(transaction, options);
-        Ok(payload)
+        let is_supported = match transaction.tx_type() {
+            TxType::Eip2930 | TxType::Eip4844 | TxType::Eip7702 => false,
+            TxType::Legacy | TxType::Eip1559 => true,
+        };
+        if is_supported {
+            return Ok(convert_to_visual_sign_payload(transaction, options));
+        }
+        Err(VisualSignError::DecodeError(format!(
+            "Unsupported transaction type: {}",
+            transaction.tx_type()
+        )))
     }
 }
 
 impl VisualSignConverterFromString<EthereumTransactionWrapper> for EthereumVisualSignConverter {}
+fn decode_transaction_bytes(mut buf: &[u8]) -> Result<TypedTransaction, EthereumParserError> {
+    let tx = if buf.is_empty() {
+        Err(EthereumParserError::FailedToDecodeTransaction(
+            "Input too short".to_string(),
+        ))
+    } else if buf[0] == 0 || (buf[0] > 0x7f && buf[0] < 0xc0) {
+        Err(EthereumParserError::FailedToDecodeTransaction(format!(
+            "Unexpected type flag {}.",
+            buf[0]
+        )))
+    } else if buf[0] <= 0x7f {
+        let ty: TxType = match buf[0].try_into() {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(EthereumParserError::FailedToDecodeTransaction(
+                    e.to_string(),
+                ));
+            }
+        };
+        buf.advance(1); // Skip type byte
+        match ty {
+            TxType::Eip1559 => Ok(TypedTransaction::Eip1559(
+                alloy_consensus::TxEip1559::decode(&mut buf)
+                    .map_err(|e| EthereumParserError::FailedToDecodeTransaction(e.to_string()))?,
+            )),
+            TxType::Eip2930 => Err(EthereumParserError::UnsupportedTransactionType(
+                "eip-2930".to_string(),
+            )),
+            TxType::Eip4844 => Err(EthereumParserError::UnsupportedTransactionType(
+                "eip-4844".to_string(),
+            )),
+            TxType::Eip7702 => Err(EthereumParserError::UnsupportedTransactionType(
+                "eip-7702".to_string(),
+            )),
+            TxType::Legacy => Err(EthereumParserError::UnexpectedTransactionType(
+                "legacy".to_string(), // This shouldn't happen
+            )),
+        }
+    } else {
+        Ok(TypedTransaction::Legacy(
+            alloy_consensus::TxLegacy::decode(&mut buf)
+                .map_err(|e| EthereumParserError::FailedToDecodeTransaction(e.to_string()))?,
+        ))
+    };
+    if tx.is_ok() && !buf.is_empty() {
+        return Err(EthereumParserError::UnexpectedTrailingData(hex::encode(
+            buf,
+        )));
+    }
+    tx
+}
 
 fn decode_transaction(
     raw_transaction: &str,
     encodings: SupportedEncodings,
-) -> Result<TypedTransaction, Box<dyn std::error::Error>> {
+) -> Result<TypedTransaction, EthereumParserError> {
     let bytes = match encodings {
         SupportedEncodings::Hex => {
             let clean_hex = raw_transaction
                 .strip_prefix("0x")
                 .unwrap_or(raw_transaction);
-            hex::decode(clean_hex).map_err(|e| format!("Failed to decode hex: {}", e))?
+            hex::decode(clean_hex).map_err(|e| {
+                EthereumParserError::FailedToDecodeTransaction(format!(
+                    "Failed to decode hex: {}",
+                    e
+                ))
+            })?
         }
-        SupportedEncodings::Base64 => b64
-            .decode(raw_transaction)
-            .map_err(|e| format!("Failed to decode base64: {}", e))?,
+        SupportedEncodings::Base64 => b64.decode(raw_transaction).map_err(|e| {
+            EthereumParserError::FailedToDecodeTransaction(format!(
+                "Failed to decode base64: {}",
+                e
+            ))
+        })?,
     };
-
-    // Check if it's a typed transaction (EIP-2718)
-    // Typed transactions start with a transaction type byte (0x01, 0x02, 0x03)
-    if bytes.is_empty() || bytes[0] > 0x7f {
-        // This is a legacy transaction (pre-EIP-2718)
-        // Legacy transactions are RLP-encoded directly without a type prefix
-        let tx = alloy_consensus::TxLegacy::decode(&mut bytes.as_slice())
-            .map_err(|e| format!("Failed to decode legacy transaction: {}", e))?;
-        return Ok(TypedTransaction::Legacy(tx));
-    }
-    match bytes[0] {
-        0x01 => {
-            // EIP-2930: Optional access lists
-            // let tx = alloy_consensus::TxEip2930::decode(&mut &bytes[1..])
-            //      .map_err(|e| format!("Failed to decode EIP-2930 transaction: {}", e))?;
-            // Ok(TypedTransaction::Eip2930(tx))
-            Err("Unsupported variant eip-2930".into())
-        }
-        0x02 => {
-            // EIP-1559: Fee market change
-            let tx = alloy_consensus::TxEip1559::decode(&mut &bytes[1..])
-                .map_err(|e| format!("Failed to decode EIP-1559 transaction: {}", e))?;
-            Ok(TypedTransaction::Eip1559(tx))
-        }
-        0x03 => {
-            // EIP-4844: Blob transactions
-            // let tx = alloy_consensus::TxEip4844::decode(&mut &bytes[1..])
-            //    .map_err(|e| format!("Failed to decode EIP-4844 transaction: {}", e))?;
-            // Ok(TypedTransaction::Eip4844(
-            //      alloy_consensus::TxEip4844Variant::TxEip4844(tx),
-            // ))
-            Err("Unsupported variant eip-4844".into())
-        }
-        0x04 => {
-            // EIP-7702: Set EOA account code
-            //let tx = alloy_consensus::TxEip7702::decode(&mut &bytes[1..])
-            //    .map_err(|e| format!("Failed to decode EIP-7702 transaction: {}", e))?;
-            //Ok(TypedTransaction::Eip7702(tx))
-            Err("Unsupported variant eip-7702".into())
-        }
-        _ => Err(format!("Unknown transaction type: 0x{:02x}", bytes[0]).into()),
-    }
+    decode_transaction_bytes(&bytes)
 }
 
 fn convert_to_visual_sign_payload(
@@ -137,18 +177,7 @@ fn convert_to_visual_sign_payload(
     options: VisualSignOptions,
 ) -> SignablePayload {
     // Extract chain ID to determine the network
-    let chain_id = match &transaction {
-        TypedTransaction::Legacy(tx) => tx.chain_id,
-        TypedTransaction::Eip2930(tx) => Some(tx.chain_id),
-        TypedTransaction::Eip1559(tx) => Some(tx.chain_id),
-        TypedTransaction::Eip4844(tx) => match tx {
-            alloy_consensus::TxEip4844Variant::TxEip4844(inner_tx) => Some(inner_tx.chain_id),
-            alloy_consensus::TxEip4844Variant::TxEip4844WithSidecar(sidecar_tx) => {
-                Some(sidecar_tx.tx.chain_id)
-            }
-        },
-        TypedTransaction::Eip7702(tx) => Some(tx.chain_id),
-    };
+    let chain_id = transaction.chain_id();
 
     let chain_name = chains::get_chain_name(chain_id);
 
@@ -190,42 +219,19 @@ fn convert_to_visual_sign_payload(
             },
         },
     ]);
-    // Add gas price field (handling different transaction types)
-    let gas_price_text = match &transaction {
-        TypedTransaction::Legacy(tx) => {
-            format!("{} ETH", format_ether(U256::from(tx.gas_price)))
-        }
-        TypedTransaction::Eip2930(tx) => {
-            format!("{} ETH", format_ether(U256::from(tx.gas_price)))
-        }
-        TypedTransaction::Eip1559(tx) => {
-            format!("{} ETH", format_ether(U256::from(tx.max_fee_per_gas)))
-        }
-        TypedTransaction::Eip4844(tx) => match tx {
-            alloy_consensus::TxEip4844Variant::TxEip4844(inner_tx) => {
-                format!("{} ETH", format_ether(U256::from(inner_tx.max_fee_per_gas)))
-            }
-            alloy_consensus::TxEip4844Variant::TxEip4844WithSidecar(sidecar_tx) => {
-                format!(
-                    "{} ETH",
-                    format_ether(U256::from(sidecar_tx.tx.max_fee_per_gas))
-                )
-            }
-        },
-        TypedTransaction::Eip7702(tx) => {
-            format!("{} ETH", format_ether(U256::from(tx.max_fee_per_gas)))
-        }
-    };
 
-    fields.push(SignablePayloadField::TextV2 {
-        common: SignablePayloadFieldCommon {
-            fallback_text: gas_price_text.clone(),
-            label: "Gas Price".to_string(),
-        },
-        text_v2: SignablePayloadFieldTextV2 {
-            text: gas_price_text,
-        },
-    });
+    if let Some(gas_price) = transaction.gas_price() {
+        let gas_price_text = format!("{} ETH", format_ether(U256::from(gas_price)));
+        fields.push(SignablePayloadField::TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: gas_price_text.clone(),
+                label: "Gas Price".to_string(),
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: gas_price_text,
+            },
+        });
+    }
 
     fields.push(SignablePayloadField::TextV2 {
         common: SignablePayloadFieldCommon {
@@ -278,9 +284,15 @@ pub fn transaction_string_to_visual_sign(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_consensus::{TxLegacy, TypedTransaction};
+    use alloy_consensus::{SignableTransaction, TxLegacy, TypedTransaction};
     use alloy_primitives::{Address, Bytes, ChainId, U256};
-    use alloy_rlp::Encodable;
+
+    fn unsigned_to_hex(tx: &TypedTransaction) -> String {
+        let mut encoded = Vec::new();
+        tx.encode_for_signing(&mut encoded);
+        format!("0x{}", hex::encode(&encoded))
+    }
+
     #[test]
     fn test_transaction_to_visual_sign_basic() {
         // Create a dummy Ethereum transaction
@@ -441,51 +453,74 @@ mod tests {
 
     #[test]
     fn test_transaction_wrapper_from_string() {
-        // Test with invalid hex data
-        let result = EthereumTransactionWrapper::from_string("invalid_hex_data");
-        assert!(result.is_err());
-
         // Test with empty string
-        let result = EthereumTransactionWrapper::from_string("");
-        assert!(result.is_err());
-
+        assert_eq!(
+            EthereumTransactionWrapper::from_string(""),
+            Err(TransactionParseError::DecodeError(
+                "Failed to decode transaction: Input too short".to_string()
+            )),
+        );
+        // Test with invalid hex data
+        assert_eq!(
+            EthereumTransactionWrapper::from_string("invalid_hex_data"),
+            Err(TransactionParseError::DecodeError(
+                "Failed to decode transaction: Failed to decode base64: Invalid symbol 95, offset 7.".to_string()
+            )),
+        );
         // Test with malformed hex (odd length)
-        let result = EthereumTransactionWrapper::from_string("0x123");
-        assert!(result.is_err());
-
+        assert_eq!(
+            EthereumTransactionWrapper::from_string("0x123"),
+            Err(TransactionParseError::DecodeError(
+                "Failed to decode transaction: Failed to decode hex: Odd number of digits"
+                    .to_string()
+            )),
+        );
         // Test with valid hex prefix but invalid RLP data
-        let result = EthereumTransactionWrapper::from_string("0x1234567890abcdef");
-        assert!(result.is_err());
-
+        assert_eq!(
+            EthereumTransactionWrapper::from_string("0x1234567890abcdef"),
+            Err(TransactionParseError::DecodeError(
+                "Failed to decode transaction: Unexpected type flag. Got 18.".to_string()
+            )),
+        );
         // Test with valid base64 but invalid RLP data
-        let result = EthereumTransactionWrapper::from_string("aGVsbG8gd29ybGQ=");
-        assert!(result.is_err());
-
+        assert_eq!(
+            EthereumTransactionWrapper::from_string("aGVsbG8gd29ybGQ="),
+            Err(TransactionParseError::DecodeError(
+                "Failed to decode transaction: Unexpected type flag. Got 104.".to_string()
+            )),
+        );
         // Test with unknown transaction type
-        let unknown_type_tx = "05f86401808504a817c800825208940000000000000000000000000000000000000000880de0b6b3a764000080c0";
-        let result = EthereumTransactionWrapper::from_string(&format!("0x{}", unknown_type_tx));
-        assert!(result.is_err());
-        if let Err(TransactionParseError::DecodeError(msg)) = result {
-            assert!(msg.contains("Unknown transaction type"));
-        } else {
-            panic!("Expected decode error for unknown transaction type");
-        }
-
+        assert_eq!(
+            EthereumTransactionWrapper::from_string(
+                "0x05f86401808504a817c800825208940000000000000000000000000000000000000000880de0b6b3a764000080c0"
+            ),
+            Err(TransactionParseError::DecodeError(
+                "Failed to decode transaction: Unexpected type flag. Got 5.".to_string()
+            )),
+        );
         // Test with corrupted typed transaction (invalid RLP after type byte)
-        let corrupted_typed_tx = "02ff";
-        let result = EthereumTransactionWrapper::from_string(&format!("0x{}", corrupted_typed_tx));
-        assert!(result.is_err());
-
+        assert_eq!(
+            EthereumTransactionWrapper::from_string("0x02ff"),
+            Err(TransactionParseError::DecodeError(
+                "Failed to decode transaction: input too short".to_string()
+            )),
+        );
         // Test with valid transaction type but insufficient data
-        let insufficient_data = "02";
-        let result = EthereumTransactionWrapper::from_string(&format!("0x{}", insufficient_data));
-        assert!(result.is_err());
-
+        assert_eq!(
+            EthereumTransactionWrapper::from_string("0x02"),
+            Err(TransactionParseError::DecodeError(
+                "Failed to decode transaction: input too short".to_string()
+            )),
+        );
         // Test with whitespace in input (should fail due to invalid format)
-        let result = EthereumTransactionWrapper::from_string(" 0x1234 ");
-        assert!(result.is_err());
-
-        let tx = TypedTransaction::Legacy(TxLegacy {
+        assert_eq!(
+            EthereumTransactionWrapper::from_string(" 0x1234 "),
+            Err(TransactionParseError::DecodeError(
+                "Failed to decode transaction: Failed to decode base64: Invalid symbol 32, offset 0.".to_string()
+            )),
+        );
+        // Test with legacy transaction
+        let legacy_tx = TypedTransaction::Legacy(TxLegacy {
             chain_id: Some(ChainId::from(1u64)),
             nonce: 0,
             gas_price: 20_000_000_000u128,
@@ -494,41 +529,10 @@ mod tests {
             value: U256::ZERO,
             input: Bytes::new(),
         });
-
-        // Encode the transaction to RLP bytes
-        let mut encoded = Vec::new();
-        if let TypedTransaction::Legacy(ref legacy_tx) = tx {
-            legacy_tx.encode(&mut encoded);
-        }
-
-        // Convert to hex string for testing
-        let hex_string = format!("0x{}", hex::encode(&encoded));
-
-        // Test parsing the encoded transaction
-        let result = EthereumTransactionWrapper::from_string(&hex_string);
-        assert!(
-            result.is_ok(),
-            "Should successfully parse encoded transaction"
+        assert_eq!(
+            EthereumTransactionWrapper::from_string(&unsigned_to_hex(&legacy_tx)),
+            Ok(EthereumTransactionWrapper::new(legacy_tx.clone())),
         );
-
-        let wrapper = result.unwrap();
-        assert_eq!(wrapper.transaction_type(), "Ethereum");
-
-        // Compare the decoded transaction with the original
-        if let (TypedTransaction::Legacy(original), TypedTransaction::Legacy(decoded)) =
-            (&tx, wrapper.inner())
-        {
-            assert_eq!(original.chain_id, decoded.chain_id);
-            assert_eq!(original.nonce, decoded.nonce);
-            assert_eq!(original.gas_price, decoded.gas_price);
-            assert_eq!(original.gas_limit, decoded.gas_limit);
-            assert_eq!(original.to, decoded.to);
-            assert_eq!(original.value, decoded.value);
-            assert_eq!(original.input, decoded.input);
-        } else {
-            panic!("Expected both transactions to be Legacy type");
-        }
-
         // Test with EIP-1559 transaction
         let eip1559_tx = TypedTransaction::Eip1559(alloy_consensus::TxEip1559 {
             chain_id: ChainId::from(1u64),
@@ -541,73 +545,68 @@ mod tests {
             access_list: Default::default(),
             input: Bytes::new(),
         });
-
-        // Encode EIP-1559 transaction
-        let mut eip1559_encoded = vec![0x02]; // EIP-1559 type prefix
-        if let TypedTransaction::Eip1559(ref eip1559) = eip1559_tx {
-            eip1559.encode(&mut eip1559_encoded);
-        }
-
-        let eip1559_hex = format!("0x{}", hex::encode(&eip1559_encoded));
-        let eip1559_result = EthereumTransactionWrapper::from_string(&eip1559_hex);
-        assert!(
-            eip1559_result.is_ok(),
-            "Should successfully parse EIP-1559 transaction"
+        assert_eq!(
+            EthereumTransactionWrapper::from_string(&unsigned_to_hex(&eip1559_tx)),
+            Ok(EthereumTransactionWrapper::new(eip1559_tx.clone())),
         );
-
-        let eip1559_wrapper = eip1559_result.unwrap();
-        // Compare the decoded EIP-1559 transaction with the original
-        if let (TypedTransaction::Eip1559(original), TypedTransaction::Eip1559(decoded)) =
-            (&eip1559_tx, eip1559_wrapper.inner())
-        {
-            assert_eq!(original.chain_id, decoded.chain_id);
-            assert_eq!(original.nonce, decoded.nonce);
-            assert_eq!(original.gas_limit, decoded.gas_limit);
-            assert_eq!(original.max_fee_per_gas, decoded.max_fee_per_gas);
-            assert_eq!(
-                original.max_priority_fee_per_gas,
-                decoded.max_priority_fee_per_gas
-            );
-            assert_eq!(original.to, decoded.to);
-            assert_eq!(original.value, decoded.value);
-            assert_eq!(original.access_list, decoded.access_list);
-            assert_eq!(original.input, decoded.input);
-        } else {
-            panic!("Expected both transactions to be EIP-1559 type");
-        }
-
         // Test with EIP-2930 transaction (unsupported)
-        let eip2930_encoded = vec![0x01, 0x12, 0x34]; // EIP-2930 type prefix with dummy data
-        let eip2930_hex = format!("0x{}", hex::encode(&eip2930_encoded));
-        let eip2930_result = EthereumTransactionWrapper::from_string(&eip2930_hex);
-        assert!(eip2930_result.is_err());
-        if let Err(TransactionParseError::DecodeError(msg)) = eip2930_result {
-            assert!(msg.contains("Unsupported variant eip-2930"));
-        } else {
-            panic!("Expected decode error for unsupported EIP-2930 transaction");
-        }
-
+        let eip2930_tx = TypedTransaction::Eip2930(alloy_consensus::TxEip2930 {
+            chain_id: ChainId::from(1u64),
+            nonce: 1,
+            gas_limit: 21000,
+            gas_price: 20_000_000_000u128,
+            to: alloy_primitives::TxKind::Call(Address::ZERO),
+            value: U256::from(1000000000000000000u64),
+            access_list: Default::default(),
+            input: Bytes::new(),
+        });
+        assert_eq!(
+            EthereumTransactionWrapper::from_string(&unsigned_to_hex(&eip2930_tx)),
+            Err(TransactionParseError::DecodeError(
+                "Unsupported transaction type: eip-2930".to_string()
+            ))
+        );
         // Test with EIP-4844 transaction (unsupported)
-        let eip4844_encoded = vec![0x03, 0x56, 0x78]; // EIP-4844 type prefix with dummy data
-        let eip4844_hex = format!("0x{}", hex::encode(&eip4844_encoded));
-        let eip4844_result = EthereumTransactionWrapper::from_string(&eip4844_hex);
-        assert!(eip4844_result.is_err());
-        if let Err(TransactionParseError::DecodeError(msg)) = eip4844_result {
-            assert!(msg.contains("Unsupported variant eip-4844"));
-        } else {
-            panic!("Expected decode error for unsupported EIP-4844 transaction");
-        }
-
+        let eip4844_tx = TypedTransaction::Eip4844(alloy_consensus::TxEip4844Variant::TxEip4844(
+            alloy_consensus::TxEip4844 {
+                chain_id: ChainId::from(1u64),
+                nonce: 1,
+                gas_limit: 21000,
+                max_fee_per_gas: 30_000_000_000u128,
+                max_priority_fee_per_gas: 2_000_000_000u128,
+                to: Address::ZERO,
+                value: U256::from(1000000000000000000u64),
+                access_list: Default::default(),
+                input: Bytes::new(),
+                blob_versioned_hashes: Default::default(),
+                max_fee_per_blob_gas: 10_000_000_000u128,
+            },
+        ));
+        assert_eq!(
+            EthereumTransactionWrapper::from_string(&unsigned_to_hex(&eip4844_tx)),
+            Err(TransactionParseError::DecodeError(
+                "Unsupported transaction type: eip-4844".to_string()
+            ))
+        );
         // Test with EIP-7702 transaction (unsupported)
-        let eip7702_encoded = vec![0x04, 0x9a, 0xbc]; // EIP-7702 type prefix with dummy data
-        let eip7702_hex = format!("0x{}", hex::encode(&eip7702_encoded));
-        let eip7702_result = EthereumTransactionWrapper::from_string(&eip7702_hex);
-        assert!(eip7702_result.is_err());
-        if let Err(TransactionParseError::DecodeError(msg)) = eip7702_result {
-            assert!(msg.contains("Unsupported variant eip-7702"));
-        } else {
-            panic!("Expected decode error for unsupported EIP-7702 transaction");
-        }
+        let eip7702_tx = TypedTransaction::Eip7702(alloy_consensus::TxEip7702 {
+            chain_id: ChainId::from(1u64),
+            nonce: 1,
+            gas_limit: 21000,
+            max_fee_per_gas: 30_000_000_000u128,
+            max_priority_fee_per_gas: 2_000_000_000u128,
+            to: Address::ZERO,
+            value: U256::from(1000000000000000000u64),
+            access_list: Default::default(),
+            input: Bytes::new(),
+            authorization_list: Default::default(),
+        });
+        assert_eq!(
+            EthereumTransactionWrapper::from_string(&unsigned_to_hex(&eip7702_tx)),
+            Err(TransactionParseError::DecodeError(
+                "Unsupported transaction type: eip-7702".to_string()
+            ))
+        );
     }
 
     #[test]
@@ -654,20 +653,78 @@ mod tests {
     #[test]
     fn test_transaction_to_visual_sign_public_api() {
         // Test the public API function
-        let test_tx = "0xf86c808504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83";
-        let options = VisualSignOptions::default();
-        let tx = EthereumTransactionWrapper::from_string(test_tx).unwrap();
-
-        let result = transaction_to_visual_sign(tx.inner().clone(), options);
-
-        match result {
-            Ok(payload) => {
-                assert_eq!(payload.title, "Ethereum Transaction");
-            }
-            Err(e) => {
-                eprintln!("Public API failed with error: {:?}", e);
-                panic!("Public API should work but got error: {:?}", e);
-            }
-        }
+        let tx = TypedTransaction::Eip1559(alloy_consensus::TxEip1559 {
+            chain_id: ChainId::from(1u64),
+            nonce: 1,
+            gas_limit: 21000,
+            max_fee_per_gas: 30_000_000_000u128,
+            max_priority_fee_per_gas: 2_000_000_000u128,
+            to: alloy_primitives::TxKind::Call(Address::ZERO),
+            value: U256::from(1000000000000000000u64),
+            access_list: Default::default(),
+            input: Bytes::new(),
+        });
+        assert_eq!(
+            transaction_string_to_visual_sign(
+                &unsigned_to_hex(&tx),
+                VisualSignOptions {
+                    decode_transfers: true,
+                    transaction_name: Some("Test Transaction".to_string()),
+                }
+            ),
+            Ok(SignablePayload::new(
+                0,
+                "Test Transaction".to_string(),
+                None,
+                vec![
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "Ethereum Mainnet".to_string(),
+                            label: "Network".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "Ethereum Mainnet".to_string(),
+                        },
+                    },
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "0x0000000000000000000000000000000000000000".to_string(),
+                            label: "To".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "0x0000000000000000000000000000000000000000".to_string(),
+                        },
+                    },
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "1 ETH".to_string(),
+                            label: "Value".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "1 ETH".to_string(),
+                        },
+                    },
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "21000".to_string(),
+                            label: "Gas Limit".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "21000".to_string(),
+                        },
+                    },
+                    SignablePayloadField::TextV2 {
+                        common: SignablePayloadFieldCommon {
+                            fallback_text: "1".to_string(),
+                            label: "Nonce".to_string(),
+                        },
+                        text_v2: SignablePayloadFieldTextV2 {
+                            text: "1".to_string(),
+                        },
+                    },
+                ],
+                "EthereumTx".to_string()
+            ))
+        );
     }
 }
