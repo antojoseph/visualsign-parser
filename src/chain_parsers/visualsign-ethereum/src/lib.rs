@@ -301,26 +301,24 @@ fn convert_to_visual_sign_payload(
     let input = transaction.input();
     if !input.is_empty() {
         if options.decode_transfers {
-            if let Some(metadata) = options.metadata {
-                if let ChainMetadata::Ethereum(eth_metadata) = metadata {
-                    if let Some(abi) = eth_metadata.abi {
-                        match provider::json_abi::parse_json_abi_input(input.clone(), &abi.value) {
-                            Ok(decoded_fields) => fields.extend(decoded_fields),
-                            Err(e) => {
-                                // TODO: return error instead
-                                fields.push(SignablePayloadField::TextV2 {
-                                    common: SignablePayloadFieldCommon {
-                                        fallback_text: format!("Error decoding input: {e}"),
-                                        label: "Input Data".to_string(),
-                                    },
-                                    text_v2: SignablePayloadFieldTextV2 {
-                                        text: format!("Error decoding input: {e}"),
-                                    },
-                                });
-                            }
+            if let Some(ChainMetadata::Ethereum(metadata)) = options.metadata {
+                if let Some(abi) = metadata.abi {
+                    match provider::json_abi::parse_json_abi_input(input.clone(), &abi.value) {
+                        Ok(decoded_fields) => fields.extend(decoded_fields),
+                        Err(e) => {
+                            // TODO: return error instead
+                            fields.push(SignablePayloadField::TextV2 {
+                                common: SignablePayloadFieldCommon {
+                                    fallback_text: format!("Error decoding input: {e}"),
+                                    label: "Input Data".to_string(),
+                                },
+                                text_v2: SignablePayloadFieldTextV2 {
+                                    text: format!("Error decoding input: {e}"),
+                                },
+                            });
                         }
-                        // TODO: if abi signature is provided add to signable payload
                     }
+                    // TODO: if abi signature is provided add to signable payload
                 }
             }
         }
@@ -524,6 +522,7 @@ mod tests {
         let options = VisualSignOptions {
             decode_transfers: false,
             transaction_name: Some("Custom Transaction Title".to_string()),
+            metadata: None,
         };
         let payload = transaction_to_visual_sign(tx, options).unwrap();
 
@@ -749,6 +748,7 @@ mod tests {
                 VisualSignOptions {
                     decode_transfers: true,
                     transaction_name: Some("Test Transaction".to_string()),
+                    metadata: None,
                 }
             ),
             Ok(SignablePayload::new(

@@ -33,6 +33,7 @@ fn test_with_fixtures() {
         let options = VisualSignOptions {
             decode_transfers: true,
             transaction_name: None,
+            metadata: None, // No metadata for this test
         };
 
         let result = transaction_string_to_visual_sign(transaction_hex, options);
