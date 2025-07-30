@@ -31,7 +31,7 @@ pub fn parse(
     let options = VisualSignOptions {
         decode_transfers: true,
         transaction_name: None,
-        metadata: None, // No metadata for this test
+        metadata: parse_request.chain_metadata.clone(),
     };
     let registry = create_registry();
     let proto_chain = ProtoChain::from_i32(parse_request.chain)

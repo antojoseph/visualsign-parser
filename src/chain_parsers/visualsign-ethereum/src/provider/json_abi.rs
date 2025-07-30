@@ -1,5 +1,5 @@
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
-use alloy_json_abi::JsonAbi;
+use alloy_json_abi::{JsonAbi, Param};
 use alloy_primitives::{Bytes, FixedBytes};
 use visualsign::{
     AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldCommon,
@@ -39,34 +39,44 @@ pub fn parse_json_abi_input(
         },
     }];
     for (param, value) in function.inputs.iter().zip(decoded) {
-        fields.push(dynsol_to_signable_field(&param.name, &value));
+        fields.push(dynsol_to_signable_field(&param, &value));
     }
     Ok(fields)
 }
 
-fn dynsol_to_signable_field(label: &str, value: &DynSolValue) -> SignablePayloadField {
+fn dynsol_to_signable_field(param: &Param, value: &DynSolValue) -> SignablePayloadField {
     match value {
         DynSolValue::Array(arr) => {
             let annotated_fields: Vec<AnnotatedPayloadField> = arr
                 .iter()
                 .enumerate()
-                .map(|(i, v)| AnnotatedPayloadField {
-                    signable_payload_field: dynsol_to_signable_field(&format!("Element {i}"), v),
-                    static_annotation: None,
-                    dynamic_annotation: None,
+                .map(|(i, v)| {
+                    let elem_param = if let Some(component) = param.components.get(i) {
+                        component.clone()
+                    } else {
+                        let mut p = param.clone();
+                        p.name = format!("{}[{}]", param.name, i);
+                        p
+                    };
+                    AnnotatedPayloadField {
+                        signable_payload_field: dynsol_to_signable_field(&elem_param, v),
+                        static_annotation: None,
+                        dynamic_annotation: None,
+                    }
                 })
                 .collect();
 
             SignablePayloadField::ListLayout {
                 common: SignablePayloadFieldCommon {
                     fallback_text: format!(
-                        "{label}: [{}]",
+                        "{}: [{}]",
+                        param.name,
                         arr.iter()
                             .map(format_abi_value)
                             .collect::<Vec<_>>()
                             .join(", ")
                     ),
-                    label: label.to_string(),
+                    label: param.name.clone(),
                 },
                 list_layout: SignablePayloadFieldListLayout {
                     fields: annotated_fields,
@@ -77,33 +87,48 @@ fn dynsol_to_signable_field(label: &str, value: &DynSolValue) -> SignablePayload
             let annotated_fields: Vec<AnnotatedPayloadField> = arr
                 .iter()
                 .enumerate()
-                .map(|(i, v)| AnnotatedPayloadField {
-                    signable_payload_field: dynsol_to_signable_field(&format!("Field {i}"), v),
-                    static_annotation: None,
-                    dynamic_annotation: None,
+                .map(|(i, v)| {
+                    let field_param = param.components.get(i).cloned().unwrap_or_else(|| {
+                        let mut p = Param::default();
+                        p.name = format!("{}_field_{}", param.name, i);
+                        p
+                    });
+                    AnnotatedPayloadField {
+                        signable_payload_field: dynsol_to_signable_field(&field_param, v),
+                        static_annotation: None,
+                        dynamic_annotation: None,
+                    }
                 })
                 .collect();
 
-            SignablePayloadField::ListLayout {
+            SignablePayloadField::PreviewLayout {
                 common: SignablePayloadFieldCommon {
                     fallback_text: format!(
-                        "{label}: ({})",
+                        "{}: ({})",
+                        param.name,
                         arr.iter()
                             .map(format_abi_value)
                             .collect::<Vec<_>>()
                             .join(", ")
                     ),
-                    label: label.to_string(),
+                    label: param.name.clone(),
                 },
-                list_layout: SignablePayloadFieldListLayout {
-                    fields: annotated_fields,
+                preview_layout: visualsign::SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 {
+                        text: param.name.clone(),
+                    }),
+                    subtitle: None,
+                    condensed: None,
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: annotated_fields,
+                    }),
                 },
             }
         }
         _ => SignablePayloadField::TextV2 {
             common: SignablePayloadFieldCommon {
                 fallback_text: format_abi_value(value),
-                label: label.to_string(),
+                label: param.name.clone(),
             },
             text_v2: SignablePayloadFieldTextV2 {
                 text: format_abi_value(value),
