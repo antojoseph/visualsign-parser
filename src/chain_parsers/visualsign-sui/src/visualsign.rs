@@ -1,23 +1,15 @@
-use crate::commands::{CoinObject, TransferInfo, detect_transfer_from_transaction};
-use crate::field_helpers::{
-    create_address_field, create_amount_field, create_raw_data_field, create_simple_text_field,
-    create_text_field,
-};
+use crate::commands::add_tx_commands;
 use crate::module_resolver::SuiModuleResolver;
-
-use base64::Engine;
+use crate::utils;
+use crate::visualiser::{add_tx_details, add_tx_network, determine_transaction_type_string};
 
 use move_bytecode_utils::module_cache::SyncModuleCache;
 
-use sui_json_rpc_types::{
-    SuiTransactionBlockData, SuiTransactionBlockDataAPI, SuiTransactionBlockKind,
-};
-use sui_types::gas_coin::MIST_PER_SUI;
-use sui_types::transaction::{SenderSignedData, TransactionData};
+use sui_json_rpc_types::SuiTransactionBlockData;
+use sui_types::transaction::TransactionData;
 
 use visualsign::{
-    AnnotatedPayloadField, SignablePayload, SignablePayloadField, SignablePayloadFieldCommon,
-    SignablePayloadFieldListLayout, SignablePayloadFieldPreviewLayout, SignablePayloadFieldTextV2,
+    SignablePayload,
     encodings::SupportedEncodings,
     vsptrait::{
         Transaction, TransactionParseError, VisualSignConverter, VisualSignConverterFromString,
@@ -29,21 +21,6 @@ use visualsign::{
 #[derive(Debug, Clone)]
 pub struct SuiTransactionWrapper {
     transaction: TransactionData,
-}
-
-impl Transaction for SuiTransactionWrapper {
-    fn from_string(data: &str) -> Result<Self, TransactionParseError> {
-        let format = SupportedEncodings::detect(data);
-
-        let transaction = decode_transaction(data, format)
-            .map_err(|e| TransactionParseError::DecodeError(e.to_string()))?;
-
-        Ok(Self { transaction })
-    }
-
-    fn transaction_type(&self) -> String {
-        "Sui".to_string()
-    }
 }
 
 impl SuiTransactionWrapper {
@@ -58,8 +35,25 @@ impl SuiTransactionWrapper {
     }
 }
 
+impl Transaction for SuiTransactionWrapper {
+    fn from_string(data: &str) -> Result<Self, TransactionParseError> {
+        let format = SupportedEncodings::detect(data);
+
+        let transaction = utils::decode_transaction(data, format)
+            .map_err(|e| TransactionParseError::DecodeError(e.to_string()))?;
+
+        Ok(Self { transaction })
+    }
+
+    fn transaction_type(&self) -> String {
+        "Sui".to_string()
+    }
+}
+
 /// Converter that knows how to format Sui transactions for VisualSign
 pub struct SuiVisualSignConverter;
+
+impl VisualSignConverterFromString<SuiTransactionWrapper> for SuiVisualSignConverter {}
 
 impl VisualSignConverter<SuiTransactionWrapper> for SuiVisualSignConverter {
     fn to_visual_sign_payload(
@@ -77,54 +71,25 @@ impl VisualSignConverter<SuiTransactionWrapper> for SuiVisualSignConverter {
     }
 }
 
-impl VisualSignConverterFromString<SuiTransactionWrapper> for SuiVisualSignConverter {}
-
-/// Decode a transaction from string format
-pub(crate) fn decode_transaction(
-    raw_transaction: &str,
-    encodings: SupportedEncodings,
-) -> Result<TransactionData, Box<dyn std::error::Error>> {
-    if raw_transaction.is_empty() {
-        return Err("Transaction is empty".into());
-    }
-
-    let bytes = match encodings {
-        SupportedEncodings::Base64 => {
-            base64::engine::general_purpose::STANDARD.decode(raw_transaction)?
-        }
-        SupportedEncodings::Hex => hex::decode(raw_transaction)?,
-    };
-
-    if let Ok(sender_signed_data) = bcs::from_bytes::<SenderSignedData>(&bytes) {
-        return Ok(sender_signed_data.transaction_data().clone());
-    }
-
-    if let Ok(transaction_data) = bcs::from_bytes::<TransactionData>(&bytes) {
-        return Ok(transaction_data);
-    }
-
-    Err("Unable to decode transaction data as either SenderSignedData or TransactionData".into())
-}
-
 /// Convert Sui transaction to visual sign payload
 fn convert_to_visual_sign_payload(
     transaction: &TransactionData,
     decode_transfers: bool,
     title: Option<String>,
 ) -> Result<SignablePayload, VisualSignError> {
-    let block_data = SuiTransactionBlockData::try_from_with_module_cache(
+    let block_data: SuiTransactionBlockData = SuiTransactionBlockData::try_from_with_module_cache(
         transaction.clone(),
         &SyncModuleCache::new(SuiModuleResolver),
     )
     .map_err(|e| VisualSignError::ParseError(TransactionParseError::DecodeError(e.to_string())))?;
 
-    let mut fields = vec![create_simple_text_field("Network", "Sui Network")];
+    let mut fields = vec![];
 
+    add_tx_network(&mut fields);
+    add_tx_details(&mut fields, transaction, &block_data);
     if decode_transfers {
-        add_transfer_preview_layouts(&mut fields, &block_data);
+        add_tx_commands(&mut fields, &block_data);
     }
-
-    add_transaction_details_preview_layout(&mut fields, transaction, &block_data);
 
     let title = title.unwrap_or_else(|| determine_transaction_type_string(&block_data));
     Ok(SignablePayload::new(
@@ -134,210 +99,6 @@ fn convert_to_visual_sign_payload(
         fields,
         "Sui".to_string(),
     ))
-}
-
-/// Add transfer information using preview layout
-fn add_transfer_preview_layouts(
-    fields: &mut Vec<SignablePayloadField>,
-    transaction: &SuiTransactionBlockData,
-) {
-    let detected_transfers = detect_transfer_from_transaction(transaction);
-
-    let transfer_list: Vec<&TransferInfo> = detected_transfers
-        .iter()
-        // TODO: think about error handling
-        .filter_map(|x| x.as_ref().ok())
-        .collect();
-
-    for (index, transfer) in transfer_list.iter().enumerate() {
-        fields.push(create_transfer_preview_layout(transfer, index + 1));
-    }
-}
-
-/// Create a preview layout for a transfer
-fn create_transfer_preview_layout(transfer: &TransferInfo, index: usize) -> SignablePayloadField {
-    let title_text = match &transfer.coin_object {
-        CoinObject::Sui => format!(
-            "Transfer {}: {} MIST ({} SUI)",
-            index,
-            transfer.amount,
-            transfer.amount / MIST_PER_SUI,
-        ),
-        CoinObject::Unknown(_) => format!("Transfer {}: {} tokens", index, transfer.amount),
-    };
-
-    let subtitle_text = format!(
-        "From {} to {}",
-        truncate_address(&transfer.sender.to_string()),
-        truncate_address(&transfer.recipient.to_string())
-    );
-
-    // Condensed view - just the transfer summary
-    let condensed = SignablePayloadFieldListLayout {
-        fields: vec![create_text_field(
-            "Summary",
-            &format!(
-                "Transfer {} {} from {} to {}",
-                transfer.amount,
-                transfer.coin_object.get_label(),
-                truncate_address(&transfer.sender.to_string()),
-                truncate_address(&transfer.recipient.to_string())
-            ),
-        )],
-    };
-
-    // Expanded view - detailed breakdown
-    let expanded = SignablePayloadFieldListLayout {
-        fields: create_transfer_expanded_fields(transfer),
-    };
-
-    let preview_layout = SignablePayloadFieldPreviewLayout {
-        title: Some(SignablePayloadFieldTextV2 {
-            text: title_text.clone(),
-        }),
-        subtitle: Some(SignablePayloadFieldTextV2 {
-            text: subtitle_text,
-        }),
-        condensed: Some(condensed),
-        expanded: Some(expanded),
-    };
-
-    SignablePayloadField::PreviewLayout {
-        common: SignablePayloadFieldCommon {
-            fallback_text: title_text.clone(),
-            label: format!("Transfer {}", index),
-        },
-        preview_layout,
-    }
-}
-
-/// Create expanded fields for a transfer
-fn create_transfer_expanded_fields(transfer: &TransferInfo) -> Vec<AnnotatedPayloadField> {
-    vec![
-        // TODO: resolve object id
-        create_text_field("Asset Object ID", &transfer.coin_object.to_string()),
-        create_address_field("From", &transfer.sender.to_string(), None, None, None, None),
-        create_address_field(
-            "To",
-            &transfer.recipient.to_string(),
-            None,
-            None,
-            None,
-            None,
-        ),
-        create_amount_field(
-            "Amount",
-            &transfer.amount.to_string(),
-            &transfer.coin_object.get_label(),
-        ),
-    ]
-}
-
-/// Add transaction details using preview layout
-fn add_transaction_details_preview_layout(
-    fields: &mut Vec<SignablePayloadField>,
-    tx_data: &TransactionData,
-    block_data: &SuiTransactionBlockData,
-) {
-    let title_text = "Transaction Details";
-    let subtitle_text = format!("Gas: {} MIST", block_data.gas_data().budget);
-
-    let condensed = SignablePayloadFieldListLayout {
-        fields: vec![
-            create_text_field("Type", &determine_transaction_type_string(block_data)),
-            create_text_field(
-                "Gas Budget",
-                &format!("{} MIST", block_data.gas_data().budget),
-            ),
-        ],
-    };
-
-    let mut expanded = SignablePayloadFieldListLayout {
-        fields: create_transaction_expanded_fields(block_data),
-    };
-
-    if let Ok(encoded) = bcs::to_bytes::<TransactionData>(tx_data) {
-        expanded.fields.push(create_raw_data_field(&encoded));
-    }
-
-    let preview_layout = SignablePayloadFieldPreviewLayout {
-        title: Some(SignablePayloadFieldTextV2 {
-            text: title_text.to_string(),
-        }),
-        subtitle: Some(SignablePayloadFieldTextV2 {
-            text: subtitle_text,
-        }),
-        condensed: Some(condensed),
-        expanded: Some(expanded),
-    };
-
-    fields.push(SignablePayloadField::PreviewLayout {
-        common: SignablePayloadFieldCommon {
-            fallback_text: "Transaction Details".to_string(),
-            label: "Transaction".to_string(),
-        },
-        preview_layout,
-    });
-}
-
-/// Create expanded fields for transaction details
-fn create_transaction_expanded_fields(
-    tx_data: &SuiTransactionBlockData,
-) -> Vec<AnnotatedPayloadField> {
-    let mut fields = vec![
-        create_text_field(
-            "Transaction Type",
-            &determine_transaction_type_string(tx_data),
-        ),
-        create_address_field(
-            "Gas Owner",
-            &tx_data.gas_data().owner.to_string(),
-            None,
-            None,
-            None,
-            None,
-        ),
-        create_amount_field("Gas Budget", &tx_data.gas_data().budget.to_string(), "MIST"),
-        create_amount_field("Gas Price", &tx_data.gas_data().price.to_string(), "MIST"),
-    ];
-
-    if let SuiTransactionBlockKind::ProgrammableTransaction(pt) = &tx_data.transaction() {
-        fields.push(create_text_field(
-            "Commands",
-            &pt.commands.len().to_string(),
-        ));
-    }
-
-    fields
-}
-
-/// Determine transaction title based on type
-fn determine_transaction_type_string(tx_data: &SuiTransactionBlockData) -> String {
-    match &tx_data.transaction() {
-        SuiTransactionBlockKind::ProgrammableTransaction(_) => "Programmable Transaction",
-        SuiTransactionBlockKind::ChangeEpoch(_) => "Change Epoch",
-        SuiTransactionBlockKind::Genesis(_) => "Genesis Transaction",
-        SuiTransactionBlockKind::ConsensusCommitPrologue(_) => "Consensus Commit",
-        SuiTransactionBlockKind::AuthenticatorStateUpdate(_) => "Authenticator State Update",
-        SuiTransactionBlockKind::RandomnessStateUpdate(_) => "Randomness State Update",
-        SuiTransactionBlockKind::EndOfEpochTransaction(_) => "End of Epoch Transaction",
-        SuiTransactionBlockKind::ConsensusCommitPrologueV2(_) => "Consensus Commit Prologue V2",
-        SuiTransactionBlockKind::ConsensusCommitPrologueV3(_) => "Consensus Commit Prologue V3",
-        SuiTransactionBlockKind::ConsensusCommitPrologueV4(_) => "Consensus Commit Prologue V4",
-        SuiTransactionBlockKind::ProgrammableSystemTransaction(_) => {
-            "Programmable System Transaction"
-        }
-    }
-    .to_string()
-}
-
-/// Truncate address to show first 6 and last 4 characters
-fn truncate_address(address: &str) -> String {
-    if address.len() <= 10 {
-        return address.to_string();
-    }
-
-    format!("{}...{}", &address[..6], &address[address.len() - 4..])
 }
 
 /// Public API function for ease of use
@@ -361,32 +122,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_empty_transaction() {
-        let result = decode_transaction("", SupportedEncodings::Base64);
-
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "Transaction is empty");
-    }
-
-    #[test]
-    fn test_parse_native_transfer() {
-        let result = decode_transaction(
-            "AAACACCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJCrze8SNFZ4kAAIAMqaOwAAAAACAgABAQEAAQECAAABAADW6S4ALibDr7IIgAHBtYILZPK8NRv9paI0Ksv59cHKwgHLSF74CguvkHmmIcQsiwy2XOmYbhyB/RbuiAOPAEpa7Rua1BcAAAAAIGOAX4LpV/FYmnpiNGs3y1rsDwwf9O10x5SdK7vXP+9Q1ukuAC4mw6+yCIABwbWCC2TyvDUb/aWiNCrL+fXBysLoAwAAAAAAAEBLTAAAAAAAAA==",
-            SupportedEncodings::Base64,
-        );
-
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_parse_basic_transaction_info() {
-        let test_data = "AQAAAAAAAgAI6AMAAAAAAAAAIKHjrlUcKr48a86iLT8ZNWpkcIbWvVasDQnk7u0GKQt2AgIAAQEAAAEBAgAAAQEA1ukuAC4mw6+yCIABwbWCC2TyvDUb/aWiNCrL+fXBysIBy0he+AoLr5B5piHELIsMtlzpmG4cgf0W7ogDjwBKWu3zD9AUAAAAACB0zCGEALsfD5u98y58qbKGIiXkCtDxxN2Pu+r/HyOy1tbpLgAuJsOvsgiAAcG1ggtk8rw1G/2lojQqy/n1wcrC6AMAAAAAAABAS0wAAAAAAAABYQBMegviWYFsLskcYMnTIhZRxiZkET3j2RqtgG1g7f1/EuPjfCHfTvgDqVys+AA6jLWojR35eW4HoOh8qURdshkADNDs6YjOg+HDmdMLe0zMuMDJKqzwIYg08CT6mXiLc2Y=";
-        let result = decode_transaction(test_data, SupportedEncodings::Base64);
-
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn test_sui_transaction_to_vsp() {
         let test_data = "AQAAAAAAAgAI6AMAAAAAAAAAIKHjrlUcKr48a86iLT8ZNWpkcIbWvVasDQnk7u0GKQt2AgIAAQEAAAEBAgAAAQEA1ukuAC4mw6+yCIABwbWCC2TyvDUb/aWiNCrL+fXBysIBy0he+AoLr5B5piHELIsMtlzpmG4cgf0W7ogDjwBKWu3zD9AUAAAAACB0zCGEALsfD5u98y58qbKGIiXkCtDxxN2Pu+r/HyOy1tbpLgAuJsOvsgiAAcG1ggtk8rw1G/2lojQqy/n1wcrC6AMAAAAAAABAS0wAAAAAAAABYQBMegviWYFsLskcYMnTIhZRxiZkET3j2RqtgG1g7f1/EuPjfCHfTvgDqVys+AA6jLWojR35eW4HoOh8qURdshkADNDs6YjOg+HDmdMLe0zMuMDJKqzwIYg08CT6mXiLc2Y=";
         let options = VisualSignOptions::default();
@@ -394,7 +129,7 @@ mod tests {
         let result = transaction_string_to_visual_sign(test_data, options);
         assert!(result.is_ok());
 
-        let payload = result.unwrap();
+        let payload: SignablePayload = result.unwrap();
         assert_eq!(payload.title, "Programmable Transaction");
         assert_eq!(payload.version, "0");
         assert_eq!(payload.payload_type, "Sui");
@@ -423,19 +158,10 @@ mod tests {
     }
 
     #[test]
-    fn test_truncate_address() {
-        let address = "0x1234567890abcdef1234567890abcdef12345678";
-        let truncated = truncate_address(address);
-        assert_eq!(truncated, "0x1234...5678");
+    fn test_token_transfer_1() {
+        // https://suivision.xyz/txblock/4D74Jw1sA6ftnLU5JwTVmkrshtSJ5srBeaBXoHwwqXun
+        let test_data = "AQAAAAAAAwEAiH3AfwMd9LgjR4Cpv4q9ohzJH5IGeEULdceikU993ywe1bUjAAAAACBk6AzdkhBsxlD09qOl5EZAO3xcqW6YGk3I/huiKDl/JwAIsAMAAAAAAAAAIIfCtnxql1/lDJTgzlHRhoM4PhhvgsnOzBYXB2t5uPgHAgIBAAABAQEAAQECAAABAgCqoKWfAWNCech3JFGHAe31KyrhICC2Xnk32BB6CBv3iQEvqmE5BRF5+VxSGYJp3pmHy08B5Ha1j1QhOjzCugXiaB7VtSMAAAAAIL6nYe4HoYtMDfV/DHDI9cQFEojqzSSrgcY1CFS4X53NqqClnwFjQnnIdyRRhwHt9Ssq4SAgtl55N9gQeggb94kmAgAAAAAAAIg9NAAAAAAAAAFhALw7iSOLS7LpZVsR0DZ4g3N/CCfB7O3YBtJ9fmxMOhBW9r+8Qzg5enH6KpIaq8PR/+sID/qeo+rvDpxB3jXdlgtUydWB+lIRciOIfNf/w8FzDBGL/PRFz4UbH7gWBqeEZA==";
 
-        let short_address = "0x12345";
-        let truncated_short = truncate_address(short_address);
-        assert_eq!(truncated_short, "0x12345");
-    }
-
-    #[test]
-    fn test_preview_layout_structure() {
-        let test_data = "AQAAAAAAAgAI6AMAAAAAAAAAIKHjrlUcKr48a86iLT8ZNWpkcIbWvVasDQnk7u0GKQt2AgIAAQEAAAEBAgAAAQEA1ukuAC4mw6+yCIABwbWCC2TyvDUb/aWiNCrL+fXBysIBy0he+AoLr5B5piHELIsMtlzpmG4cgf0W7ogDjwBKWu3zD9AUAAAAACB0zCGEALsfD5u98y58qbKGIiXkCtDxxN2Pu+r/HyOy1tbpLgAuJsOvsgiAAcG1ggtk8rw1G/2lojQqy/n1wcrC6AMAAAAAAABAS0wAAAAAAAABYQBMegviWYFsLskcYMnTIhZRxiZkET3j2RqtgG1g7f1/EuPjfCHfTvgDqVys+AA6jLWojR35eW4HoOh8qURdshkADNDs6YjOg+HDmdMLe0zMuMDJKqzwIYg08CT6mXiLc2Y=";
         let options = VisualSignOptions {
             decode_transfers: true,
             transaction_name: None,
@@ -445,22 +171,111 @@ mod tests {
         assert!(result.is_ok());
 
         let payload = result.unwrap();
-
-        let preview_fields: Vec<_> = payload
+        let transaction_preview = payload
             .fields
             .iter()
-            .filter(|f| f.field_type() == "preview_layout")
-            .collect();
-
-        assert!(
-            !preview_fields.is_empty(),
-            "Should have preview layout fields"
-        );
-
-        let transaction_preview = payload.fields.iter().find(|f| f.label() == "Transaction");
+            .find(|f| f.label() == "Transaction Details");
         assert!(
             transaction_preview.is_some(),
-            "Should have transaction preview layout"
+            "Should have Transaction Details layout"
+        );
+    }
+
+     #[test]
+    fn test_transfer_command() {
+        // https://suivision.xyz/txblock/CE46w3GYgWnZU8HF4P149m6ANGebD22xuNqA64v7JykJ
+        let test_data = "AQAAAAAABQEAm9cmP35lHGKppWJLgoYU7aexd43oTT2ci4QzxDXFNv92CAsjAAAAACANp0teIzSyzZ4Pj5dL3YaYBdeVmiWScWL/9RCV4mUINwEAARQFJheK7qwbpqmQudEhsSyQ6AjVawfLpN4XRBhe12FH6TIiAAAAACDXzuT2xanZ36QNQSYtDhZn31zfzIlhRk5H6pTsqGdRDAEAXpykdGz3KJdaAVjyAMZQxufRYJfqzNXfOu8jVCAjEjIzfYIhAAAAACA5hk9rACYb1i5fqrUBJIgXhdUFOqOaouNWmQINCW4/WQAIAPLhNQAAAAAAIEutPmqkZpN81fwdos/haXZAQJoZsX8SvKilyMRxrv/pAwMBAAACAQEAAQIAAgEAAAEBAwABAQIBAAEEAA4x8k3bZAV+p192pmk9h7U2nGDwuTmW8EY6c95JyFHCAaCnde0j6aiVXUd/1gCf3q5Uuj1mPVIuuEpJn1teueghdggLIwAAAAAgNhuP2zGpc0qF3gRzxQC5B0lpAZR7xyssXC3gKbH8uxwOMfJN22QFfqdfdqZpPYe1Npxg8Lk5lvBGOnPeSchRwugDAAAAAAAAoIVIAAAAAAAAAWEAFrlPuI8JOSzIoIBc0xwfWia7T5uPf1PS+aSSphoTTq0lRpNuTOg8eOggpBxpLsQDrbAx3jDoWg1R8hZKR62LBex1R808U6AgiY8V7LxOVsChXFf8nSAEGaeSLQc7mJbx";
+
+        let options = VisualSignOptions {
+            decode_transfers: true,
+            transaction_name: None,
+        };
+
+        let result = transaction_string_to_visual_sign(test_data, options);
+        assert!(result.is_ok());
+
+        let payload = result.unwrap();
+        let transaction_preview = payload
+            .fields
+            .iter()
+            .find(|f| f.label() == "Transfer Command");
+        assert!(
+            transaction_preview.is_some(),
+            "Should have Transfer Command layout"
+        );
+    }
+
+     #[test]
+    fn test_stake_commands() {
+        // Stake
+        // https://suivision.xyz/txblock/4cccJLKehRtyRQY7TaNUJiM4ipauWCn8S3GNJr9RtfCN
+        let test_data = "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";
+
+        let options = VisualSignOptions {
+            decode_transfers: true,
+            transaction_name: None,
+        };
+
+        let result = transaction_string_to_visual_sign(test_data, options);
+        assert!(result.is_ok());
+
+        let payload = result.unwrap();
+        let transaction_preview = payload
+            .fields
+            .iter()
+            .find(|f| f.label() == "Stake Command");
+        assert!(
+            transaction_preview.is_some(),
+            "Should have Stake Command layout"
+        );
+    }
+
+     #[test]
+    fn test_withdraw_commands() {
+        // Withdraw
+        // https://suivision.xyz/txblock/4cccJLKehRtyRQY7TaNUJiM4ipauWCn8S3GNJr9RtfCN
+        let test_data = "AQAAAAAAAgEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUBAAAAAAAAAAEBADtuZRRZcXabYn2eLpOPGq3onyss/0Kyuv3BoB3PQPiIJHpFHQAAAAAgDlI1Bti2mpZBb/rDxYkyB+lyANUGRTtYgKbRoBow53cBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADCnN1aV9zeXN0ZW0WcmVxdWVzdF93aXRoZHJhd19zdGFrZQACAQAAAQEAPmYGcGNxVi5pj8Tk1ufHEB6SYs6TFjQYj+JG7623BnUCN8ccpwVmcafDNOXvnEAo6kzltjdniobA56to42fHdUio9wcjAAAAACDQVC4fMhsmX6OlHpAhyPR8LaRzgu43Bj8xrhlRY6YKG/Yv6m2ncHpPhbrEkOrSiyh1ID3T4FARE+raMUofCsQPqPcHIwAAAAAg5qp+jjoniUXPNG4N0/9XDFSpoUt0isbEUMiXjNtGivA+ZgZwY3FWLmmPxOTW58cQHpJizpMWNBiP4kbvrbcGdSECAAAAAAAADAqcAAAAAAAAAWEAkj0EN51BkbIUE/6lMi967MHGsBMl2i8TtntUnFhlC2rK8AW2fGQxc8mg1gTbV+2eHs1CsZ9m67cU4CWzA+9PAg//ECUrmzUzzsg0xYRgwDQDy9lAF8e6bpAa8/5Yec6s";
+
+        let options = VisualSignOptions {
+            decode_transfers: true,
+            transaction_name: None,
+        };
+
+        let result = transaction_string_to_visual_sign(test_data, options);
+        assert!(result.is_ok());
+
+        let payload = result.unwrap();
+        let transaction_preview = payload
+            .fields
+            .iter()
+            .find(|f| f.label() == "Withdraw Command");
+        assert!(
+            transaction_preview.is_some(),
+            "Should have Withdraw Command layout"
+        );
+    }
+
+     #[test]
+    fn test_cetus_amm_swap_b2a_commands() {
+        // https://suivision.xyz/txblock/7Je4yeXMvvEHFcRSTD4WYv3eSsaDk2zqvdoSxWXdUYGx
+        let test_data = "AQAAAAAACQEAEXs/ewhS1RZrUZQ2xQEliCJn40SK4PvEV75r2SGFMXhjUsAjAAAAACBSKqlrLdPXYeuzckz31NAkeSO09qmNPv/pkWggJMTC2QAIuMbAAQAAAAABAdqkYpJjLDxNjzHyPqD5s2oo/zZ36WhJgORDhAOmej2PLgUYAAAAAAAAAQFK94o+ni1sq8pdp5wea/9ImVZqQhMh/DtaYZZkAXpg1nkOqBoAAAAAAQABAQAIuMbAAQAAAAAACI0+GgMAAAAAABCvMxuoMn+7NbHE/v8AAAAAAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgEAAAAAAAAAAAMCAQAAAQEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgRjb2luBHplcm8BB9ujRnLjDLBlsfk+OrVTGHaP1v72bBWULJ98uEbi+QDnBHVzZGMEVVNEQwAAALLbcUL6gyEKfXjZwSrEnAQ7PLvUgiJP6m49oAqlpa4tDnBvb2xfc2NyaXB0X3YyCHN3YXBfYjJhAgfbo0Zy4wywZbH5Pjq1Uxh2j9b+9mwVlCyffLhG4vkA5wR1c2RjBFVTREMAB7eETiiahBDlD7PKSNaeuc8p4n0iPvkDU/4b2OJ/+PP4BGNvaW4EQ09JTgAJAQIAAQMAAgEAAgAAAQQAAQUAAQYAAQcAAQgArltnUkfA5IdctLm9N6YO1bz4kng0TThA3StCbiinZoUBZI8YcdbCiGOtIFCZV/M9U6lZTgf3lg6t7feHRsBBqR1jUsAjAAAAACCmwR6aeqn8D632smpzU9fbDhP3vPOQhgc806IrzekPH65bZ1JHwOSHXLS5vTemDtW8+JJ4NE04QN0rQm4op2aFBQIAAAAAAAC8YDQAAAAAAAABYQAdbFpPHuOPe/TYRMttj4FSzAN1ErZdI75GooTkFmiIVkvCM+lnSS3pR/qQt6j7K3gsrtBExfgOL/dffWapvuMEyeP1ig9kZWEaY4lMw99QxRTo2PcUhKsb1gquOOAGXP8=";
+
+        let options = VisualSignOptions {
+            decode_transfers: true,
+            transaction_name: None,
+        };
+
+        let result = transaction_string_to_visual_sign(test_data, options);
+        assert!(result.is_ok());
+
+        let payload = result.unwrap();
+        let transaction_preview = payload
+            .fields
+            .iter()
+            .find(|f| f.label() == "CetusAMM Swap Command");
+        assert!(
+            transaction_preview.is_some(),
+            "Should have CetusAMM Swap Command layout"
         );
     }
 }

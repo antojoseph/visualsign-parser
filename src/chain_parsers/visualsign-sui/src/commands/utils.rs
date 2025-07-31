@@ -1,10 +1,39 @@
-use move_core_types::runtime_value::MoveValue;
 use std::fmt::Display;
 
-use sui_json::{MoveTypeLayout, SuiJsonValue};
 use sui_json_rpc_types::SuiArgument::Input;
-use sui_json_rpc_types::{SuiArgument, SuiProgrammableTransactionBlock};
+use sui_json_rpc_types::{SuiArgument};
 
+#[derive(Debug, Clone)]
+pub struct Coin {
+    pub id: String,
+    pub label: String,
+}
+
+impl Coin {
+    pub fn from_string(str: &str) -> Self {
+        let parts: Vec<&str> = str.split("::").collect();
+        let id = parts.get(0).unwrap_or(&"").to_string();
+        let label = parts.get(2).unwrap_or(&"").to_string();
+
+        Coin { id, label }
+    }
+
+    pub fn get_label(&self) -> String {
+        self.label.clone()
+    }
+}
+
+impl Display for Coin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        return write!(f, "{}::{}", self.id, self.label);
+    }
+}
+
+impl Default for Coin {
+    fn default() -> Coin {
+        Coin::from_string("0x0::unknown::Unknown")
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CoinObject {
@@ -36,29 +65,14 @@ impl Default for CoinObject {
     }
 }
 
-/// Extract amount from SUI arguments in a transaction
-pub fn get_amount(
-    transaction: &SuiProgrammableTransactionBlock,
-    sui_args: &[SuiArgument],
-) -> Option<u64> {
-    let sui_value = transaction.inputs.get(get_index(sui_args)? as usize)?;
-
-    let Ok(MoveValue::U64(decoded_value)) =
-        SuiJsonValue::to_move_value(&sui_value.pure()?.to_json_value(), &MoveTypeLayout::U64)
-    else {
-        return None;
+/// Get index from SUI arguments array (expects single argument)
+pub fn get_index(sui_args: &[SuiArgument], index: Option<usize>) -> Option<u16> {
+    let arg = match index {
+        Some(i) => sui_args.get(i)?,
+        None => sui_args.first()?,
     };
 
-    Some(decoded_value)
-}
-
-/// Get index from SUI arguments array (expects single argument)
-pub fn get_index(sui_args: &[SuiArgument]) -> Option<u16> {
-    if sui_args.len() != 1 {
-        return None;
-    }
-
-    parse_numeric_argument(sui_args.first()?)
+    parse_numeric_argument(arg)
 }
 
 /// Parse numeric argument from SUI argument (Input or Result)
