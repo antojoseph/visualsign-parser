@@ -40,78 +40,56 @@ pub fn detect_transfer_from_transaction(
         return vec![];
     };
 
-    let mut transfers: Vec<Result<TransferInfo, String>> = vec![];
+    let results: Vec<Option<SplitCoinResult>> = transaction
+        .commands
+        .iter()
+        .enumerate()
+        .map(|(command_index, command)| match command {
+            SplitCoins(arg, amounts) => get_amount(transaction, amounts)
+                .map(|amount| SplitCoinResult::new(amount, get_token(transaction, arg)))
+                .ok_or_else(|| format!("Failed to get amount for command {}", command_index))
+                .ok(),
+            _ => None,
+        })
+        .collect();
 
-    let mut aggregated_transfers: HashMap<(SuiAddress, SuiAddress, CoinObject), u64> =
-        HashMap::new();
-    let mut results = vec![None::<SplitCoinResult>; transaction.commands.len()];
-
-    for (command_index, command) in transaction.commands.iter().enumerate() {
-        match command {
-            SplitCoins(arg, amounts) => {
-                let Some(amount) = get_amount(transaction, amounts) else {
-                    transfers.push(Err(format!(
-                        "Failed to get amount for command {}",
-                        command_index
-                    )));
-
-                    continue;
-                };
-
-                results[command_index] =
-                    Some(SplitCoinResult::new(amount, get_token(transaction, arg)));
-            }
+    let aggregated_transfers: HashMap<(SuiAddress, SuiAddress, CoinObject), u64> = transaction
+        .commands
+        .iter()
+        .filter_map(|command| match command {
             TransferObjects(args, arg) => {
-                let Some(result_index) = get_index(args) else {
-                    transfers.push(Err(format!(
-                        "Failed to get index for command {}",
-                        command_index
-                    )));
-                    continue;
-                };
-
-                let Some(result) = results[result_index as usize].as_ref() else {
-                    transfers.push(Err(format!(
-                        "Failed to get result for command {}",
-                        command_index
-                    )));
-                    continue;
-                };
-
-                let Some(recipient) = get_recipient(transaction, arg) else {
-                    transfers.push(Err(format!(
-                        "Failed to get recipient for command {}",
-                        command_index
-                    )));
-                    continue;
-                };
+                let result_index = get_index(args)?;
+                let result = results.get(result_index as usize)?.as_ref()?;
+                let recipient = get_recipient(transaction, arg)?;
 
                 let sender = *tx_data.sender();
                 let token = result.token.clone();
 
-                if let Some(existing_amount) =
-                    aggregated_transfers.get_mut(&(sender, recipient, token.clone()))
-                {
-                    *existing_amount += result.amount;
-                    continue;
-                }
-
-                aggregated_transfers.insert((sender, recipient, token.clone()), result.amount);
+                Some((sender, recipient, token, result.amount))
             }
-            _ => {}
-        }
-    }
+            _ => None,
+        })
+        .fold(
+            HashMap::new(),
+            |mut acc, (sender, recipient, token, amount)| {
+                acc.entry((sender, recipient, token))
+                    .and_modify(|existing_amount| *existing_amount += amount)
+                    .or_insert(amount);
+                acc
+            },
+        );
 
-    for ((sender, recipient, token), amount) in aggregated_transfers {
-        transfers.push(Ok(TransferInfo {
-            sender,
-            recipient,
-            amount,
-            coin_object: token.clone(),
-        }));
-    }
-
-    transfers
+    aggregated_transfers
+        .into_iter()
+        .map(|((sender, recipient, token), amount)| {
+            Ok(TransferInfo {
+                sender,
+                recipient,
+                amount,
+                coin_object: token,
+            })
+        })
+        .collect()
 }
 
 fn get_token(transaction: &SuiProgrammableTransactionBlock, arg: &SuiArgument) -> CoinObject {

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 pub mod encodings;
+pub mod field_builders;
 pub mod registry;
 pub mod vsptrait;
 
@@ -12,7 +13,7 @@ fn is_empty_string(s: &str) -> bool {
 // A bare bones implementation of the SignablePayload struct and its associated methods
 // The fields are serialized alphabetically to ensure that default serialization works the same
 // and the canonical representation is done by simply sorting the fields first
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayload {
     #[serde(rename = "Fields")]
     pub fields: Vec<SignablePayloadField>,
@@ -27,7 +28,7 @@ pub struct SignablePayload {
 }
 
 // Common fields shared by all field types
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldCommon {
     #[serde(rename = "FallbackText")]
     pub fallback_text: String,
@@ -36,7 +37,7 @@ pub struct SignablePayloadFieldCommon {
 }
 
 // Now SignablePayloadField is an enum with variants for each field type
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "Type")]
 pub enum SignablePayloadField {
     #[serde(rename = "text")]
@@ -180,7 +181,7 @@ impl SignablePayloadField {
 }
 
 // Update all struct definitions to use String instead of NormalString
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldPreviewLayout {
     #[serde(rename = "Title", skip_serializing_if = "Option::is_none")]
     pub title: Option<SignablePayloadFieldTextV2>,
@@ -192,25 +193,25 @@ pub struct SignablePayloadFieldPreviewLayout {
     pub expanded: Option<SignablePayloadFieldListLayout>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldListLayout {
     #[serde(rename = "Fields")]
     pub fields: Vec<AnnotatedPayloadField>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldText {
     #[serde(rename = "Text")]
     pub text: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldTextV2 {
     #[serde(rename = "Text")]
     pub text: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldAddress {
     #[serde(rename = "Address")]
     pub address: String,
@@ -218,7 +219,7 @@ pub struct SignablePayloadFieldAddress {
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldAddressV2 {
     #[serde(rename = "Address")]
     pub address: String,
@@ -232,13 +233,13 @@ pub struct SignablePayloadFieldAddressV2 {
     pub badge_text: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldNumber {
     #[serde(rename = "Number")]
     pub number: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldAmount {
     #[serde(rename = "Amount")]
     pub amount: String,
@@ -246,7 +247,7 @@ pub struct SignablePayloadFieldAmount {
     pub abbreviation: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldAmountV2 {
     #[serde(rename = "Amount")]
     pub amount: String,
@@ -254,13 +255,13 @@ pub struct SignablePayloadFieldAmountV2 {
     pub abbreviation: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldDivider {
     #[serde(rename = "Style")]
     pub style: DividerStyle,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldUnknown {
     #[serde(rename = "Data")]
     pub data: String,
@@ -268,13 +269,13 @@ pub struct SignablePayloadFieldUnknown {
     pub explanation: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldStaticAnnotation {
     #[serde(rename = "Text")]
     pub text: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SignablePayloadFieldDynamicAnnotation {
     #[serde(rename = "Type")]
     pub field_type: String,
@@ -284,7 +285,7 @@ pub struct SignablePayloadFieldDynamicAnnotation {
     pub params: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AnnotatedPayload {
     #[serde(rename = "Version")]
     pub version: String,
@@ -296,7 +297,7 @@ pub struct AnnotatedPayload {
     pub fields: Option<Vec<AnnotatedPayloadField>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AnnotatedPayloadField {
     #[serde(flatten)]
     pub signable_payload_field: SignablePayloadField,
@@ -306,7 +307,7 @@ pub struct AnnotatedPayloadField {
     pub dynamic_annotation: Option<SignablePayloadFieldDynamicAnnotation>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct UserIntent {
     #[serde(rename = "Type")]
     pub intent_type: String,
@@ -314,7 +315,7 @@ pub struct UserIntent {
     pub payload: Value,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DividerStyle(String);
 
 impl DividerStyle {

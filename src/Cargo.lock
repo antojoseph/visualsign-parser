@@ -10330,6 +10330,7 @@ checksum = "2e4fe92cfc1bad19c19925d5eee4b30584dbbdee4ff10183b261acccbef74e2d"
 name = "visualsign"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "hex",
  "pretty_assertions",
  "serde",
@@ -10350,6 +10351,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "thiserror 2.0.12",
  "visualsign",
 ]
 
