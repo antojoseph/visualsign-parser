@@ -10,7 +10,6 @@ use visualsign::SignablePayloadField;
 /// Extend this function to add new visualizers.
 fn available_visualizers() -> Vec<Box<dyn CommandVisualizer>> {
     vec![
-        Box::new(crate::presets::coin_transfer::CoinTransferVisualizer),
         Box::new(crate::presets::sui_native_staking::SuiNativeStakingVisualizer),
         Box::new(crate::presets::cetus::CetusVisualizer),
     ]
@@ -27,7 +26,7 @@ fn extract_commands_and_inputs(
 }
 
 /// Visualizes all commands in a transaction block, returning their signable fields.
-pub fn add_tx_commands(block_data: &SuiTransactionBlockData) -> Vec<SignablePayloadField> {
+pub fn decode_commands(block_data: &SuiTransactionBlockData) -> Vec<SignablePayloadField> {
     let (tx_commands, tx_inputs) = match extract_commands_and_inputs(block_data) {
         Some((cmds, inputs)) => (cmds, inputs),
         None => return vec![],
@@ -42,6 +41,26 @@ pub fn add_tx_commands(block_data: &SuiTransactionBlockData) -> Vec<SignablePayl
         .filter_map(|(command_index, _)| {
             visualize_with_any(
                 &visualizers_refs,
+                &VisualizerContext::new(block_data.sender(), command_index, tx_commands, tx_inputs),
+            )
+        })
+        .collect()
+}
+
+pub fn decode_transfers(block_data: &SuiTransactionBlockData) -> Vec<SignablePayloadField> {
+    let (tx_commands, tx_inputs) = match extract_commands_and_inputs(block_data) {
+        Some((cmds, inputs)) => (cmds, inputs),
+        None => return vec![],
+    };
+
+    let visualizer = crate::presets::coin_transfer::CoinTransferVisualizer;
+
+    tx_commands
+        .iter()
+        .enumerate()
+        .filter_map(|(command_index, _)| {
+            visualize_with_any(
+                &[&visualizer],
                 &VisualizerContext::new(block_data.sender(), command_index, tx_commands, tx_inputs),
             )
         })

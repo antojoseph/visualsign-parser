@@ -1,7 +1,7 @@
-use crate::core::commands::add_tx_commands;
+use crate::core::commands::decode_commands;
 use crate::core::helper::SuiModuleResolver;
 use crate::core::transaction::{
-    get_tx_details, get_tx_network, decode_transaction, determine_transaction_type_string,
+    decode_transaction, determine_transaction_type_string, get_tx_details, get_tx_network,
 };
 
 use move_bytecode_utils::module_cache::SyncModuleCache;
@@ -9,6 +9,7 @@ use move_bytecode_utils::module_cache::SyncModuleCache;
 use sui_json_rpc_types::SuiTransactionBlockData;
 use sui_types::transaction::TransactionData;
 
+use crate::core::commands;
 use visualsign::{
     SignablePayload, SignablePayloadField,
     encodings::SupportedEncodings,
@@ -78,7 +79,7 @@ impl VisualSignConverter<SuiTransactionWrapper> for SuiVisualSignConverter {
 /// Convert Sui transaction to visual sign payload
 fn convert_to_visual_sign_payload(
     transaction: &TransactionData,
-    _decode_transfers: bool,
+    decode_transfers: bool,
     title: Option<String>,
 ) -> Result<SignablePayload, VisualSignError> {
     let block_data: SuiTransactionBlockData = SuiTransactionBlockData::try_from_with_module_cache(
@@ -89,13 +90,14 @@ fn convert_to_visual_sign_payload(
 
     let mut fields: Vec<SignablePayloadField> = vec![
         get_tx_network().signable_payload_field,
-        get_tx_details(transaction, &block_data)
+        get_tx_details(transaction, &block_data),
     ];
 
-    // TODO: revisit this later
-    // if decode_transfers {}
+    if decode_transfers {
+        fields.extend(commands::decode_transfers(&block_data));
+    }
 
-    fields.extend(add_tx_commands(&block_data));
+    fields.extend(decode_commands(&block_data));
 
     let title = title.unwrap_or_else(|| determine_transaction_type_string(&block_data));
     Ok(SignablePayload::new(

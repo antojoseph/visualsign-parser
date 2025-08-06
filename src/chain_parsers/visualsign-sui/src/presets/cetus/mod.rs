@@ -132,10 +132,10 @@ mod tests {
         )
         .expect("Failed to visualize tx commands");
 
-        payload
+        let _ = payload
             .fields
             .iter()
             .find(|f| f.label() == CETUS_SWAP_LABEL)
-            .expect(&format!("Should have a field labeled '{CETUS_SWAP_LABEL}'"));
+            .expect("Should have a CetusAMM Swap Command field");
     }
 }
