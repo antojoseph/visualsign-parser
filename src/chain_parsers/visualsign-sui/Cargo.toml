@@ -4,11 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0"
 base64 = "0.22.1"
 hex = "0.4.3"
-
-num-traits = "0.2.19"
 
 bcs = "0.1.6"
 
