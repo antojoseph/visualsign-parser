@@ -18,11 +18,11 @@ pub fn get_tx_details(
     tx_data: &TransactionData,
     block_data: &SuiTransactionBlockData,
 ) -> SignablePayloadField {
-    let mut payload_fields: Vec<AnnotatedPayloadField> = vec![];
-
-    payload_fields.extend(create_tx_type_fields(block_data));
-    payload_fields.extend(create_tx_gas_fields(block_data));
-    payload_fields.extend(create_tx_data_fields(tx_data));
+    let payload_fields: Vec<AnnotatedPayloadField> = vec![create_tx_type_fields(block_data)]
+        .into_iter()
+        .chain(create_tx_gas_fields(block_data))
+        .chain(create_tx_data_fields(tx_data))
+        .collect();
 
     SignablePayloadField::ListLayout {
         common: SignablePayloadFieldCommon {
@@ -35,11 +35,11 @@ pub fn get_tx_details(
     }
 }
 
-fn create_tx_type_fields(block_data: &SuiTransactionBlockData) -> Vec<AnnotatedPayloadField> {
-    vec![create_text_field(
+fn create_tx_type_fields(block_data: &SuiTransactionBlockData) -> AnnotatedPayloadField {
+    create_text_field(
         "Transaction Type",
         &determine_transaction_type_string(block_data),
-    )]
+    )
 }
 
 fn create_tx_gas_fields(block_data: &SuiTransactionBlockData) -> Vec<AnnotatedPayloadField> {
