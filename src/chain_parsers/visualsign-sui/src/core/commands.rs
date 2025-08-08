@@ -1,28 +1,19 @@
-use crate::core::{CommandVisualizer, VisualizerContext, visualize_with_any};
+use crate::core::{visualize_with_any, CommandVisualizer, VisualizerContext};
 
 use sui_json_rpc_types::{
-    SuiCallArg, SuiCommand, SuiTransactionBlockData, SuiTransactionBlockDataAPI,
+    SuiTransactionBlockData, SuiTransactionBlockDataAPI,
     SuiTransactionBlockKind,
 };
+
 use visualsign::SignablePayloadField;
 
 include!(concat!(env!("OUT_DIR"), "/generated_visualizers.rs"));
 
-/// Extracts commands and inputs from a programmable transaction, or returns None.
-fn extract_commands_and_inputs(
-    block_data: &SuiTransactionBlockData,
-) -> Option<(&Vec<SuiCommand>, &Vec<SuiCallArg>)> {
-    match block_data.transaction() {
-        SuiTransactionBlockKind::ProgrammableTransaction(tx) => Some((&tx.commands, &tx.inputs)),
-        _ => None,
-    }
-}
-
 /// Visualizes all commands in a transaction block, returning their signable fields.
 pub fn decode_commands(block_data: &SuiTransactionBlockData) -> Vec<SignablePayloadField> {
-    let (tx_commands, tx_inputs) = match extract_commands_and_inputs(block_data) {
-        Some((cmds, inputs)) => (cmds, inputs),
-        None => return vec![],
+    let (tx_commands, tx_inputs) = match block_data.transaction() {
+        SuiTransactionBlockKind::ProgrammableTransaction(tx) => (&tx.commands, &tx.inputs),
+        _ => return vec![],
     };
 
     let visualizers: Vec<Box<dyn CommandVisualizer>> = available_visualizers();
@@ -42,9 +33,9 @@ pub fn decode_commands(block_data: &SuiTransactionBlockData) -> Vec<SignablePayl
 }
 
 pub fn decode_transfers(block_data: &SuiTransactionBlockData) -> Vec<SignablePayloadField> {
-    let (tx_commands, tx_inputs) = match extract_commands_and_inputs(block_data) {
-        Some((cmds, inputs)) => (cmds, inputs),
-        None => return vec![],
+    let (tx_commands, tx_inputs) = match block_data.transaction() {
+        SuiTransactionBlockKind::ProgrammableTransaction(tx) => (&tx.commands, &tx.inputs),
+        _ => return vec![],
     };
 
     let visualizer = crate::presets::coin_transfer::CoinTransferVisualizer;
