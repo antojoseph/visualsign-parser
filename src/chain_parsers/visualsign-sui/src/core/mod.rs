@@ -156,6 +156,15 @@ pub fn visualize_with_any(
 ) -> Option<VisualizeResult> {
     visualizers.iter().find_map(|v| {
         if v.can_handle(context) {
+            tracing::debug!(
+                "Handling command {:?} with visualizer {:?}",
+                context
+                    .commands()
+                    .get(context.command_index())
+                    .map(|c| c.to_string()),
+                v.kind()
+            );
+
             v.visualize_tx_commands(context)
                 .map(|field| VisualizeResult {
                     field,
