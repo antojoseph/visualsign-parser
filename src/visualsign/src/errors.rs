@@ -7,4 +7,6 @@ pub enum VisualSignError {
     MissingField(String),
     #[error("Invalid number field: '{0}' contains non-numeric characters or is empty.")]
     InvalidNumberField(String),
+    #[error("Empty field provided")]
+    EmptyField(String),
 }

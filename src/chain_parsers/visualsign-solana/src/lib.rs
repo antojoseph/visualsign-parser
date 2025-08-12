@@ -1117,7 +1117,7 @@ fn create_jupiter_swap_expanded_fields(
                         &token.human_readable_amount,
                         &token.symbol,
                     )
-                    .expect("Quted Output Amount needs to be numeric or token symbol missing"),
+                    .expect("Quoted Output Amount needs to be numeric or token symbol missing"),
                 );
                 if !token.name.is_empty() && token.name != token.symbol {
                     fields.push(create_text_field("Output Token Name", &token.name).unwrap());

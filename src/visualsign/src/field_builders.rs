@@ -23,26 +23,27 @@ pub fn create_text_field(
     })
 }
 
-pub fn create_number_field(
-    label: &str,
-    number: &str,
-    unit: &str,
-) -> Result<AnnotatedPayloadField, errors::VisualSignError> {
+fn validate_number_string(number: &str) -> Result<bool, errors::VisualSignError> {
     // Validate that the number string is a valid f64.
     match number.parse::<f64>() {
-        Ok(n) if n.is_nan() => {
-            return Err(errors::VisualSignError::InvalidNumberField(
-                number.to_string(),
-            ));
-        }
+        Ok(n) if n.is_nan() || n.is_infinite() => Err(errors::VisualSignError::InvalidNumberField(
+            number.to_string(),
+        )),
         Err(_) => {
             return Err(errors::VisualSignError::InvalidNumberField(
                 number.to_string(), // for debugging, we don't want to show this to users as-is
             ));
         }
-        Ok(_) => {} // valid number, continue
+        Ok(_) => Ok(true), // valid number, continue
     }
+}
 
+pub fn create_number_field(
+    label: &str,
+    number: &str,
+    unit: &str,
+) -> Result<AnnotatedPayloadField, errors::VisualSignError> {
+    validate_number_string(number)?;
     // If unit is empty, fallback_text shouldn't have trailing space.
     let fallback_text = if unit.is_empty() {
         number.to_string()
@@ -70,14 +71,10 @@ pub fn create_amount_field(
     amount: &str,
     abbreviation: &str,
 ) -> Result<AnnotatedPayloadField, errors::VisualSignError> {
-    if amount.parse::<f64>().is_err() {
-        return Err(errors::VisualSignError::InvalidNumberField(
-            amount.to_string(),
-        ));
-    }
+    validate_number_string(amount)?;
     // unlike number field, we do want amount fields to have a valid symbol
     if abbreviation.is_empty() {
-        return Err(errors::VisualSignError::MissingField(
+        return Err(errors::VisualSignError::EmptyField(
             abbreviation.to_string(),
         ));
     }
@@ -252,7 +249,7 @@ mod tests {
     fn test_create_amount_field_missing_abbreviation() {
         let err = create_amount_field("Label", "123", "").unwrap_err();
         match err {
-            VisualSignError::MissingField(ref s) if s.is_empty() => {}
+            VisualSignError::EmptyField(ref s) if s.is_empty() => {}
             _ => panic!("Expected MissingField error"),
         }
     }
