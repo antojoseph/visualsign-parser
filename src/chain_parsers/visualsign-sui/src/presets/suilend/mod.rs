@@ -8,7 +8,7 @@ use visualsign::{
 };
 
 use crate::core::{CommandVisualizer, SuiIntegrationConfig, VisualizerContext, VisualizerKind};
-use crate::presets::suilend::config::{LendingMarketFunction, SUILEND_CONFIG};
+use crate::presets::suilend::config::{SuiLendMarketFunction, SUILEND_CONFIG};
 
 use crate::utils::{
     SuiCoin, SuiPackage, create_address_field, decode_number, get_index, get_nested_result_value,
@@ -30,7 +30,7 @@ impl CommandVisualizer for SuilendVisualizer {
         };
 
         match function {
-            LendingMarketFunction::Repay => {
+            SuiLendMarketFunction::Repay => {
                 let coin: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
                 let package: SuiPackage =
                     get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
@@ -86,7 +86,7 @@ impl CommandVisualizer for SuilendVisualizer {
                     })
                 }
             }
-            LendingMarketFunction::ClaimRewardsAndDeposit => {
+            SuiLendMarketFunction::ClaimRewardsAndDeposit => {
                 let coin: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
                 let package: SuiPackage =
                     get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();

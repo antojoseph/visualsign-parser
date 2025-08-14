@@ -4,35 +4,35 @@ use std::collections::HashMap;
 use crate::core::{SuiIntegrationConfig, SuiIntegrationConfigData};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LendingMarketFunction {
+pub enum SuiLendMarketFunction {
     Repay,
     ClaimRewardsAndDeposit,
 }
 
-impl TryFrom<&str> for LendingMarketFunction {
+impl TryFrom<&str> for SuiLendMarketFunction {
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "repay" => Ok(LendingMarketFunction::Repay),
-            "claim_rewards_and_deposit" => Ok(LendingMarketFunction::ClaimRewardsAndDeposit),
+            "repay" => Ok(SuiLendMarketFunction::Repay),
+            "claim_rewards_and_deposit" => Ok(SuiLendMarketFunction::ClaimRewardsAndDeposit),
             _ => Err(format!("Unsupported function name: {}", value)),
         }
     }
 }
 
-impl LendingMarketFunction {
+impl SuiLendMarketFunction {
     pub fn as_str(&self) -> &'static str {
         match self {
-            LendingMarketFunction::Repay => "repay",
-            LendingMarketFunction::ClaimRewardsAndDeposit => "claim_rewards_and_deposit",
+            SuiLendMarketFunction::Repay => "repay",
+            SuiLendMarketFunction::ClaimRewardsAndDeposit => "claim_rewards_and_deposit",
         }
     }
 
     pub fn get_supported_functions() -> Vec<&'static str> {
         vec![
-            LendingMarketFunction::Repay.as_str(),
-            LendingMarketFunction::ClaimRewardsAndDeposit.as_str(),
+            SuiLendMarketFunction::Repay.as_str(),
+            SuiLendMarketFunction::ClaimRewardsAndDeposit.as_str(),
         ]
     }
 }
@@ -46,7 +46,7 @@ impl SuiIntegrationConfig for Config {
         let mut modules = HashMap::new();
         modules.insert(
             "lending_market",
-            LendingMarketFunction::get_supported_functions(),
+            SuiLendMarketFunction::get_supported_functions(),
         );
 
         let mut packages = HashMap::new();
