@@ -4,6 +4,26 @@ use crate::{
     SignablePayloadFieldCommon, SignablePayloadFieldNumber, SignablePayloadFieldTextV2,
 };
 
+use regex::Regex;
+// thread-safe static initialization for regex
+use std::sync::LazyLock;
+
+// Regex to validate signed proper numbers (e.g., -123.45, +678.90)
+// A signed proper number is defined as a string that starts with an optional sign (+ or - or -),
+// followed by one or more digits, a decimal point, and one or more digits.
+// Examples of valid signed proper numbers: "123.45", "-123.45", "+678.90"
+// Examples of invalid signed proper numbers: "123", "-.45", "123.", "abc", "12.3.4"
+// Note: This regex does not allow leading zeros unless the number is exactly "0" or "0.0".
+// It also does not allow numbers with multiple decimal points or non-numeric characters.
+// It allows numbers like "0.0", "-0.0", "+0.0"
+// which are valid representations of zero.
+// The reason it's implemented this way is to avoid adding a large dependency like bignum on this library which could be used in a wide range of applications.
+// The regex is designed to be simple and efficient for the common use case of validating signed decimal. We don't yet use it as a numeric type yet, if that ever changes, this will be refactored.
+static SIGNED_PROPER_NUMBER_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^([-+]?[0-9]+\.[0-9]+|[-+]?0)$")
+        .expect("Failed to compile regex for signed proper number")
+});
+
 pub fn create_text_field(
     label: &str,
     text: &str,
@@ -24,17 +44,17 @@ pub fn create_text_field(
 }
 
 fn validate_number_string(number: &str) -> Result<bool, errors::VisualSignError> {
-    // Validate that the number string is a valid f64.
-    match number.parse::<f64>() {
-        Ok(n) if n.is_nan() || n.is_infinite() => Err(errors::VisualSignError::InvalidNumberField(
+    if number.is_empty() {
+        return Err(errors::VisualSignError::EmptyField(number.to_string()));
+    }
+
+    // Check if the number is a valid signed proper number
+    if SIGNED_PROPER_NUMBER_RE.is_match(number) {
+        Ok(true)
+    } else {
+        Err(errors::VisualSignError::InvalidNumberField(
             number.to_string(),
-        )),
-        Err(_) => {
-            return Err(errors::VisualSignError::InvalidNumberField(
-                number.to_string(), // for debugging, we don't want to show this to users as-is
-            ));
-        }
-        Ok(_) => Ok(true), // valid number, continue
+        ))
     }
 }
 
@@ -208,6 +228,15 @@ mod tests {
                 "USDC",
             ),
             ("", "0", "TOKEN", "", "0 TOKEN", "0", "TOKEN"),
+            (
+                "Wei As ETH",
+                "0.0000000000000000001",
+                "ETH",
+                "Wei As ETH",
+                "0.0000000000000000001 ETH",
+                "0.0000000000000000001",
+                "ETH",
+            ),
         ];
 
         for (
