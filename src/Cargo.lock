@@ -3716,6 +3716,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "include_dir"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "923d117408f1e49d914f1a379a309cffe4f18c05cf4e3d12e613a15fc81bd0dd"
+dependencies = [
+ "include_dir_macros",
+]
+
+[[package]]
+name = "include_dir_macros"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cab85a7ed0bd5f0e76d93846e0147172bed2e2d3f859bcc33a8d9699cad1a75"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "indenter"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5299,7 +5318,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "visualsign",
+ "visualsign 0.1.0",
  "visualsign-ethereum",
  "visualsign-solana",
  "visualsign-sui",
@@ -5319,7 +5338,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "visualsign",
+ "visualsign 0.1.0",
  "visualsign-solana",
  "visualsign-unspecified",
 ]
@@ -5465,6 +5484,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd6780a80ae0c52cc120a26a1a42c1ae51b247a253e4e06113d23d2c2edd078"
 dependencies = [
  "phf_macros",
+ "phf_shared",
+]
+
+[[package]]
+name = "phf_codegen"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aef8048c789fa5e851558d709946d6d79a8ff88c0440c587967f8e94bfb1216a"
+dependencies = [
+ "phf_generator",
  "phf_shared",
 ]
 
@@ -10778,6 +10807,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "visualsign"
+version = "0.1.0"
+source = "git+ssh://git@github.com/anchorageoss/visualsign-parser.git?branch=main#db12a545d43535a491ac06db37e009ca6344300b"
+dependencies = [
+ "base64 0.22.1",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "visualsign-erc7730-adapter"
+version = "0.1.0"
+source = "git+ssh://git@github.com/anchorageoss/visualsign-erc-7730-adapter.git?branch=alloy-version-bump-1.0.20#26d328f3f456b37672dc8e80e32f518397874413"
+dependencies = [
+ "alloy-consensus",
+ "alloy-primitives",
+ "alloy-rlp",
+ "anyhow",
+ "clap",
+ "hex",
+ "serde",
+ "serde_json",
+ "visualsign 0.1.0 (git+ssh://git@github.com/anchorageoss/visualsign-parser.git?branch=main)",
+]
+
+[[package]]
 name = "visualsign-ethereum"
 version = "0.1.0"
 dependencies = [
@@ -10787,11 +10844,16 @@ dependencies = [
  "alloy-rlp",
  "base64 0.22.1",
  "hex",
+ "include_dir",
  "log",
+ "once_cell",
+ "phf",
+ "phf_codegen",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
- "visualsign",
+ "visualsign 0.1.0",
+ "visualsign-erc7730-adapter",
 ]
 
 [[package]]
@@ -10810,7 +10872,7 @@ dependencies = [
  "spl-associated-token-account 6.0.0",
  "spl-stake-pool",
  "spl-token 7.0.0",
- "visualsign",
+ "visualsign 0.1.0",
 ]
 
 [[package]]
@@ -10826,14 +10888,14 @@ dependencies = [
  "sui-json",
  "sui-json-rpc-types",
  "sui-types",
- "visualsign",
+ "visualsign 0.1.0",
 ]
 
 [[package]]
 name = "visualsign-unspecified"
 version = "0.1.0"
 dependencies = [
- "visualsign",
+ "visualsign 0.1.0",
 ]
 
 [[package]]
