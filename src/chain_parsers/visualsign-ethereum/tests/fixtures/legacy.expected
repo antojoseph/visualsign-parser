@@ -9,22 +9,26 @@ SignablePayload {
                 text: "Unknown Network",
             },
         },
-        TextV2 {
+        Address {
             common: SignablePayloadFieldCommon {
                 fallback_text: "0x2910543Af39abA0Cd09dBb2D50200b3E800A63D2",
                 label: "To",
             },
-            text_v2: SignablePayloadFieldTextV2 {
-                text: "0x2910543Af39abA0Cd09dBb2D50200b3E800A63D2",
+            address: SignablePayloadFieldAddress {
+                address: "0x2910543Af39abA0Cd09dBb2D50200b3E800A63D2",
+                name: "To",
             },
         },
-        TextV2 {
+        AmountV2 {
             common: SignablePayloadFieldCommon {
                 fallback_text: "5909.9 ETH",
                 label: "Value",
             },
-            text_v2: SignablePayloadFieldTextV2 {
-                text: "5909.9 ETH",
+            amount_v2: SignablePayloadFieldAmountV2 {
+                amount: "5909.9",
+                abbreviation: Some(
+                    "ETH",
+                ),
             },
         },
         TextV2 {

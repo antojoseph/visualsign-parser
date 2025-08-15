@@ -286,25 +286,12 @@ fn convert_to_visual_sign_payload(
     if !input.is_empty() {
         let mut input_fields: Vec<SignablePayloadField> = Vec::new();
         if options.decode_transfers {
-            let mut erc20_fields = contracts::erc20::parse_erc20_transfer(input);
-            let mut uniswap_fields = contracts::uniswap::parse_universal_router_execute(input);
-
-            if erc20_fields.is_empty() && uniswap_fields.is_empty() {
-                // If no specific contract parsing was successful, show raw input data
-                fields.push(SignablePayloadField::TextV2 {
-                    common: SignablePayloadFieldCommon {
-                        fallback_text: format!("0x{}", hex::encode(input)),
-                        label: "Input Data".to_string(),
-                    },
-                    text_v2: SignablePayloadFieldTextV2 {
-                        text: format!("0x{}", hex::encode(input)),
-                    },
-                });
-            } else {
-                fields.append(&mut erc20_fields);
-                fields.append(&mut uniswap_fields);
-            }
-        } else {
+            input_fields.append(&mut contracts::erc20::parse_erc20_transfer(input));
+        }
+        input_fields.append(&mut contracts::uniswap::parse_universal_router_execute(
+            input,
+        ));
+        if input_fields.is_empty() {
             fields.push(SignablePayloadField::TextV2 {
                 common: SignablePayloadFieldCommon {
                     fallback_text: format!("0x{}", hex::encode(input)),
@@ -747,22 +734,24 @@ mod tests {
                             text: "Ethereum Mainnet".to_string(),
                         },
                     },
-                    SignablePayloadField::TextV2 {
+                    SignablePayloadField::Address {
                         common: SignablePayloadFieldCommon {
                             fallback_text: "0x0000000000000000000000000000000000000000".to_string(),
                             label: "To".to_string(),
                         },
-                        text_v2: SignablePayloadFieldTextV2 {
-                            text: "0x0000000000000000000000000000000000000000".to_string(),
+                        address: SignablePayloadFieldAddress {
+                            address: "0x0000000000000000000000000000000000000000".to_string(),
+                            name: "To".to_string(),
                         },
                     },
-                    SignablePayloadField::TextV2 {
+                    SignablePayloadField::AmountV2 {
                         common: SignablePayloadFieldCommon {
                             fallback_text: "1 ETH".to_string(),
                             label: "Value".to_string(),
                         },
-                        text_v2: SignablePayloadFieldTextV2 {
-                            text: "1 ETH".to_string(),
+                        amount_v2: SignablePayloadFieldAmountV2 {
+                            amount: "1".to_string(),
+                            abbreviation: Some("ETH".to_string()),
                         },
                     },
                     SignablePayloadField::TextV2 {

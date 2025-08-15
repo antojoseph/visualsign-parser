@@ -12011,6 +12011,7 @@ dependencies = [
  "chrono",
  "hex",
  "log",
+ "num_enum 0.7.5",
  "serde",
  "serde_json",
  "thiserror 2.0.17",

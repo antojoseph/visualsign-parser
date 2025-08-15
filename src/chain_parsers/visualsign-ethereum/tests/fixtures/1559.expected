@@ -9,22 +9,26 @@ SignablePayload {
                 text: "Ethereum Mainnet",
             },
         },
-        TextV2 {
+        Address {
             common: SignablePayloadFieldCommon {
                 fallback_text: "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af",
                 label: "To",
             },
-            text_v2: SignablePayloadFieldTextV2 {
-                text: "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af",
+            address: SignablePayloadFieldAddress {
+                address: "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af",
+                name: "To",
             },
         },
-        TextV2 {
+        AmountV2 {
             common: SignablePayloadFieldCommon {
                 fallback_text: "0.005 ETH",
                 label: "Value",
             },
-            text_v2: SignablePayloadFieldTextV2 {
-                text: "0.005 ETH",
+            amount_v2: SignablePayloadFieldAmountV2 {
+                amount: "0.005",
+                abbreviation: Some(
+                    "ETH",
+                ),
             },
         },
         TextV2 {
@@ -65,11 +69,11 @@ SignablePayload {
         },
         TextV2 {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Universal Router Execute: 4 commands ([FILL_AND_SETTLE, PAY_TO_WALLET, APPROVE, TRANSFER]), deadline 2025-07-24 21:15:28 UTC",
+                fallback_text: "Universal Router Execute: 4 commands ([WrapEth, V2SwapExactIn, PayPortion, Sweep]), deadline 2025-07-24 21:15:28 UTC",
                 label: "Universal Router",
             },
             text_v2: SignablePayloadFieldTextV2 {
-                text: "Commands: [FILL_AND_SETTLE, PAY_TO_WALLET, APPROVE, TRANSFER]\nDeadline: 2025-07-24 21:15:28 UTC",
+                text: "Commands: [WrapEth, V2SwapExactIn, PayPortion, Sweep]\nDeadline: 2025-07-24 21:15:28 UTC",
             },
         },
     ],

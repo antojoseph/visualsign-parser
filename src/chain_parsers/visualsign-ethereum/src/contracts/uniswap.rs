@@ -1,241 +1,147 @@
-use alloy_sol_types::{SolCall, sol};
+use alloy_sol_types::{SolCall as _, sol};
 use chrono::{TimeZone, Utc};
+use num_enum::TryFromPrimitive;
 use visualsign::{SignablePayloadField, SignablePayloadFieldCommon, SignablePayloadFieldTextV2};
 
+// From: https://github.com/Uniswap/universal-router/blob/main/contracts/interfaces/IUniversalRouter.sol
 sol! {
-    // This interface is a combination of common elements found in Uniswap V4's
-    // IUniversalRouter and related types. Always verify with the latest official sources.
-
-    // --- Enums ---
-    // The Command enum defines the various operations the Universal Router can perform.
-    // Each command corresponds to a specific action (e.g., swapping, settling, taking assets).
-    #[derive(Debug)]
-    enum Command {
-        // V4_SWAP is for interacting with Uniswap V4 pools
-        V4_SWAP,
-        // WRAP_ETH allows wrapping Ether into WETH
-        WRAP_ETH,
-        // UNWRAP_WETH allows unwrapping WETH back to Ether
-        UNWRAP_WETH,
-        // SWEEP allows sweeping tokens to a recipient
-        SWEEP,
-        // TRANSFER allows transferring tokens
-        TRANSFER,
-        // PERMIT2_PERMIT allows setting allowances via Permit2
-        PERMIT2_PERMIT,
-        // APPROVE allows approving tokens for spending
-        APPROVE,
-        // TAKE_FROM_ASSETS allows taking assets from the Universal Router's asset buffer
-        TAKE_FROM_ASSETS,
-        // PAY_TO_WALLET allows paying assets to a wallet
-        PAY_TO_WALLET,
-        // SETTLE_ALL settles all assets
-        SETTLE_ALL,
-        // TAKE_ALL takes all assets
-        TAKE_ALL,
-        // FILL_AND_SETTLE fills an order and settles assets
-        FILL_AND_SETTLE,
-        // V3_SWAP_EXACT_IN performs an exact input swap on Uniswap V3
-        V3_SWAP_EXACT_IN,
-        // V3_SWAP_EXACT_OUT performs an exact output swap on Uniswap V3
-        V3_SWAP_EXACT_OUT,
-        // V3_SWAP_EXACT_IN_SINGLE performs an exact input swap on a single Uniswap V3 pool
-        V3_SWAP_EXACT_IN_SINGLE,
-        // V3_SWAP_EXACT_OUT_SINGLE performs an exact output swap on a single Uniswap V3 pool
-        V3_SWAP_EXACT_OUT_SINGLE,
-        // V3_MINT mints liquidity on Uniswap V3
-        V3_MINT,
-        // V3_BURN burns liquidity on Uniswap V3
-        V3_BURN,
-        // V3_COLLECT collects fees/liquidity on Uniswap V3
-        V3_COLLECT,
-        // V3_INCREASE_LIQUIDITY increases liquidity on Uniswap V3
-        V3_INCREASE_LIQUIDITY,
-        // V3_DECREASE_LIQUIDITY decreases liquidity on Uniswap V3
-        V3_DECREASE_LIQUIDITY,
-        // ... (add more commands as V4 evolves)
-    }
-
-    // --- Structs ---
-    // PoolKey uniquely identifies a Uniswap V4 pool.
-    struct PoolKey {
-        address currency0;
-        address currency1;
-        uint24 fee;
-        int24 tickSpacing;
-        address hooks; // Address of the hooks contract, can be zero address
-    }
-
-    // V4SwapParams defines parameters for a V4_SWAP command.
-    struct V4SwapParams {
-        bytes poolKey; // Encoded PoolKey
-        address recipient;
-        uint128 amount;
-        uint128 sqrtPriceLimitX96;
-        bool zeroForOne;
-    }
-
-    // Permit2PermitParams defines parameters for a PERMIT2_PERMIT command.
-    struct Permit2PermitParams {
-        address token;
-        uint160 amount;
-        uint48 expiration;
-        uint48 nonce;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
-    // ExactInputSingleParams for V3 swaps.
-    struct ExactInputSingleParams {
-        PoolKey poolKey; // Using the V4 PoolKey for V3 interaction
-        address recipient;
-        uint256 amountIn;
-        uint256 minAmountOut;
-        uint160 sqrtPriceLimitX96;
-    }
-
-    // ExactOutputSingleParams for V3 swaps.
-    struct ExactOutputSingleParams {
-        PoolKey poolKey;
-        address recipient;
-        uint256 amountOut;
-        uint256 maxAmountIn;
-        uint160 sqrtPriceLimitX96;
-    }
-
-    // V3MintParams defines parameters for V3_MINT.
-    struct V3MintParams {
-        PoolKey poolKey;
-        address recipient;
-        int24 tickLower;
-        int24 tickUpper;
-        uint128 amount;
-        bytes data; // Arbitrary data for hooks/callbacks
-    }
-
-    // V3BurnParams defines parameters for V3_BURN.
-    struct V3BurnParams {
-        PoolKey poolKey;
-        int24 tickLower;
-        int24 tickUpper;
-        uint128 amount;
-    }
-
-    // V3CollectParams defines parameters for V3_COLLECT.
-    struct V3CollectParams {
-        PoolKey poolKey;
-        address recipient;
-        int24 tickLower;
-        int24 tickUpper;
-        uint128 amount0Max;
-        uint128 amount1Max;
-    }
-
-    // --- Interface Definition ---
-    // This defines the core functions of the Universal Router.
     #[sol(rpc)]
     interface IUniversalRouter {
-        // The primary function for executing a series of commands.
-        // `commands`: A byte string where each byte represents a `Command` enum variant.
-        // `inputs`: An array of tightly packed bytes, where each element corresponds to
-        //           the parameters for a command specified in the `commands` byte string.
-        // `deadline`: The timestamp after which the transaction will revert if not executed.
-        function execute(
-            bytes commands,
-            bytes[] inputs,
-            uint256 deadline
-        ) external payable;
+        /// @notice Executes encoded commands along with provided inputs. Reverts if deadline has expired.
+        /// @param commands A set of concatenated commands, each 1 byte in length
+        /// @param inputs An array of byte strings containing abi encoded inputs for each command
+        /// @param deadline The deadline by which the transaction must be executed
+        function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
     }
 }
 
-#[derive(Debug)]
-struct UniversalRouterExecute {
-    commands: Vec<u8>,
-    deadline: String,
+// From: https://github.com/Uniswap/universal-router/blob/main/contracts/libraries/Commands.sol
+#[derive(Copy, Clone, Debug, Eq, PartialEq, TryFromPrimitive)]
+#[repr(u8)]
+pub enum Command {
+    V3SwapExactIn = 0x00,
+    V3SwapExactOut = 0x01,
+    Permit2TransferFrom = 0x02,
+    Permit2PermitBatch = 0x03,
+    Sweep = 0x04,
+    Transfer = 0x05,
+    PayPortion = 0x06,
+
+    V2SwapExactIn = 0x08,
+    V2SwapExactOut = 0x09,
+    Permit2Permit = 0x0a,
+    WrapEth = 0x0b,
+    UnwrapWeth = 0x0c,
+    Permit2TransferFromBatch = 0x0d,
+    BalanceCheckErc20 = 0x0e,
+
+    V4Swap = 0x10,
+    V3PositionManagerPermit = 0x11,
+    V3PositionManagerCall = 0x12,
+    V4InitializePool = 0x13,
+    V4PositionManagerCall = 0x14,
+
+    ExecuteSubPlan = 0x21,
 }
 
-fn decode_universal_router_execute(input: &[u8]) -> Option<UniversalRouterExecute> {
-    if input.len() < 4 {
-        return None;
+fn map_commands(raw: &[u8]) -> Option<Vec<Command>> {
+    let mut out = Vec::with_capacity(raw.len());
+    for &b in raw {
+        out.push(Command::try_from(b).unwrap());
     }
-    if let Ok(call) = IUniversalRouter::executeCall::abi_decode(input) {
-        let deadline = Utc
-            .timestamp_opt(call.deadline.try_into().ok()?, 0)
-            .unwrap();
-        Some(UniversalRouterExecute {
-            commands: call.commands.0.to_vec(),
-            deadline: deadline.to_string(),
-        })
+    Some(out)
+}
+
+fn make_field(
+    commands: &[u8],
+    deadline: Option<&str>,
+    mapped: &Vec<Command>,
+) -> SignablePayloadField {
+    let (fallback, text) = if let Some(dl) = deadline {
+        (
+            format!(
+                "Universal Router Execute: {} commands ({:?}), deadline {}",
+                commands.len(),
+                mapped,
+                dl
+            ),
+            format!("Commands: {:?}\nDeadline: {}", mapped, dl),
+        )
     } else {
-        None
+        (
+            format!(
+                "Universal Router Execute: {} commands ({:?})",
+                commands.len(),
+                mapped
+            ),
+            format!("Commands: {:?}", mapped),
+        )
+    };
+    SignablePayloadField::TextV2 {
+        common: SignablePayloadFieldCommon {
+            fallback_text: fallback,
+            label: "Universal Router".to_string(),
+        },
+        text_v2: SignablePayloadFieldTextV2 { text },
     }
 }
 
 pub fn parse_universal_router_execute(input: &[u8]) -> Vec<SignablePayloadField> {
     let mut fields = Vec::new();
-    if let Some(decoded) = decode_universal_router_execute(input) {
-        let mapped_commands: Vec<Command> = {
-            let mut cmds = Vec::with_capacity(decoded.commands.len());
-            for &cmd in &decoded.commands {
-                match Command::try_from(cmd) {
-                    Ok(c) => cmds.push(c),
-                    Err(_) => return [].to_vec(),
-                }
-            }
-            cmds
+    if input.len() < 4 {
+        return fields;
+    }
+    if let Ok(call) = IUniversalRouter::executeCall::abi_decode(input) {
+        let deadline_val: i64 = match call.deadline.try_into() {
+            Ok(val) => val,
+            Err(_) => return fields,
         };
-        fields.push(SignablePayloadField::TextV2 {
-            common: SignablePayloadFieldCommon {
-                fallback_text: format!(
-                    "Universal Router Execute: {} commands ({:?}), deadline {}",
-                    decoded.commands.len(),
-                    mapped_commands,
-                    decoded.deadline
-                ),
-                label: "Universal Router".to_string(),
-            },
-            text_v2: SignablePayloadFieldTextV2 {
-                text: format!(
-                    "Commands: {:?}\nDeadline: {}",
-                    mapped_commands, decoded.deadline
-                ),
-            },
-        });
+        let deadline = if deadline_val > 0 {
+            Utc.timestamp_opt(deadline_val, 0)
+                .single()
+                .map(|dt| dt.to_string())
+        } else {
+            None
+        };
+        let commands = call.commands.0;
+        if let Some(mapped) = map_commands(&commands) {
+            fields.push(make_field(&commands, deadline.as_deref(), &mapped));
+        }
     }
     fields
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use alloy_primitives::Uint;
 
     #[test]
-    fn test_decode_universal_router_execute_invalid_selector() {
-        // Wrong selector
+    fn test_parse_universal_router_execute_invalid_selector() {
+        // Wrong selector, but parse_universal_router_execute just returns empty Vec
         let input_data = vec![0x00, 0x00, 0x00, 0x00];
-        assert!(decode_universal_router_execute(&input_data).is_none());
+        let fields = parse_universal_router_execute(&input_data);
+        assert!(fields.is_empty());
     }
 
     #[test]
-    fn test_decode_universal_router_execute_too_short() {
+    fn test_parse_universal_router_execute_too_short() {
         // Less than 4 bytes
         let input_data = vec![0x35, 0x93, 0x56];
-        assert!(decode_universal_router_execute(&input_data).is_none());
+        let fields = parse_universal_router_execute(&input_data);
+        assert!(fields.is_empty());
     }
 
     #[test]
-    fn test_parse_universal_router_execute_field() {
+    fn test_parse_universal_router_execute_field_with_deadline() {
         let commands: Vec<u8> = vec![
-            Command::V4_SWAP.into(),
-            Command::APPROVE.into(),
-            Command::TRANSFER.into(),
+            Command::V4Swap as u8,
+            Command::Transfer as u8,
+            Command::Permit2Permit as u8,
         ];
         let inputs: Vec<Vec<u8>> = vec![];
         let deadline = Uint::<256, 4>::from(1234567890);
         let call = IUniversalRouter::executeCall {
-            commands: commands.into(),
+            commands: commands.clone().into(),
             inputs: inputs.iter().map(|v| v.clone().into()).collect(),
             deadline,
         };
@@ -245,13 +151,36 @@ mod tests {
         assert_eq!(fields.len(), 1);
         if let SignablePayloadField::TextV2 { common, text_v2 } = &fields[0] {
             assert_eq!(
-                "Universal Router Execute: 3 commands ([V4_SWAP, APPROVE, TRANSFER]), deadline 2009-02-13 23:31:30 UTC",
+                "Universal Router Execute: 3 commands ([V4Swap, Transfer, Permit2Permit]), deadline 2009-02-13 23:31:30 UTC",
                 common.fallback_text
             );
             assert_eq!(
-                "Commands: [V4_SWAP, APPROVE, TRANSFER]\nDeadline: 2009-02-13 23:31:30 UTC",
+                "Commands: [V4Swap, Transfer, Permit2Permit]\nDeadline: 2009-02-13 23:31:30 UTC",
                 text_v2.text
             );
+        } else {
+            panic!("Expected TextV2 field");
+        }
+    }
+
+    #[test]
+    fn test_parse_universal_router_execute_field_without_deadline() {
+        let commands: Vec<u8> = vec![Command::V3SwapExactIn as u8, Command::Transfer as u8];
+        let inputs: Vec<Vec<u8>> = vec![];
+        let call = IUniversalRouter::executeCall {
+            commands: commands.clone().into(),
+            inputs: inputs.iter().map(|v| v.clone().into()).collect(),
+            deadline: Uint::<256, 4>::from(0),
+        };
+        let input_data = call.abi_encode();
+        let fields = parse_universal_router_execute(&input_data);
+        assert_eq!(fields.len(), 1);
+        if let SignablePayloadField::TextV2 { common, text_v2 } = &fields[0] {
+            assert_eq!(
+                "Universal Router Execute: 2 commands ([V3SwapExactIn, Transfer])",
+                common.fallback_text
+            );
+            assert_eq!("Commands: [V3SwapExactIn, Transfer]", text_v2.text);
         } else {
             panic!("Expected TextV2 field");
         }
