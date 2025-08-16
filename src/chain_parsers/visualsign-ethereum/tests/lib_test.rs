@@ -38,7 +38,7 @@ fn test_with_fixtures() {
         let result = transaction_string_to_visual_sign(transaction_hex, options);
 
         let actual_output = match result {
-            Ok(payload) => format!("{:#?}", payload),
+            Ok(payload) => payload.to_json().unwrap(),
             Err(error) => format!("Error: {:?}", error),
         };
 

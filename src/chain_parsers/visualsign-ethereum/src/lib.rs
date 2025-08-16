@@ -286,13 +286,18 @@ fn convert_to_visual_sign_payload(
     if !input.is_empty() {
         let mut input_fields: Vec<SignablePayloadField> = Vec::new();
         if options.decode_transfers {
-            input_fields.append(&mut contracts::erc20::parse_erc20_transfer(input));
+            if let Some(field) = (contracts::erc20::ERC20Visualizer {}).visualize_tx_commands(input)
+            {
+                input_fields.push(field);
+            }
         }
-        input_fields.append(&mut contracts::uniswap::parse_universal_router_execute(
-            input,
-        ));
+        if let Some(field) =
+            (contracts::uniswap::UniswapV4Visualizer {}).visualize_tx_commands(input)
+        {
+            input_fields.push(field);
+        }
         if input_fields.is_empty() {
-            fields.push(SignablePayloadField::TextV2 {
+            input_fields.push(SignablePayloadField::TextV2 {
                 common: SignablePayloadFieldCommon {
                     fallback_text: format!("0x{}", hex::encode(input)),
                     label: "Input Data".to_string(),

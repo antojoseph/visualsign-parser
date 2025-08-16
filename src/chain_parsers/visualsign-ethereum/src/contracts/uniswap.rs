@@ -43,145 +43,454 @@ pub enum Command {
     ExecuteSubPlan = 0x21,
 }
 
-fn map_commands(raw: &[u8]) -> Option<Vec<Command>> {
+fn map_commands(raw: &[u8]) -> Vec<Command> {
     let mut out = Vec::with_capacity(raw.len());
     for &b in raw {
-        out.push(Command::try_from(b).unwrap());
-    }
-    Some(out)
-}
-
-fn make_field(
-    commands: &[u8],
-    deadline: Option<&str>,
-    mapped: &Vec<Command>,
-) -> SignablePayloadField {
-    let (fallback, text) = if let Some(dl) = deadline {
-        (
-            format!(
-                "Universal Router Execute: {} commands ({:?}), deadline {}",
-                commands.len(),
-                mapped,
-                dl
-            ),
-            format!("Commands: {:?}\nDeadline: {}", mapped, dl),
-        )
-    } else {
-        (
-            format!(
-                "Universal Router Execute: {} commands ({:?})",
-                commands.len(),
-                mapped
-            ),
-            format!("Commands: {:?}", mapped),
-        )
-    };
-    SignablePayloadField::TextV2 {
-        common: SignablePayloadFieldCommon {
-            fallback_text: fallback,
-            label: "Universal Router".to_string(),
-        },
-        text_v2: SignablePayloadFieldTextV2 { text },
-    }
-}
-
-pub fn parse_universal_router_execute(input: &[u8]) -> Vec<SignablePayloadField> {
-    let mut fields = Vec::new();
-    if input.len() < 4 {
-        return fields;
-    }
-    if let Ok(call) = IUniversalRouter::executeCall::abi_decode(input) {
-        let deadline_val: i64 = match call.deadline.try_into() {
-            Ok(val) => val,
-            Err(_) => return fields,
-        };
-        let deadline = if deadline_val > 0 {
-            Utc.timestamp_opt(deadline_val, 0)
-                .single()
-                .map(|dt| dt.to_string())
-        } else {
-            None
-        };
-        let commands = call.commands.0;
-        if let Some(mapped) = map_commands(&commands) {
-            fields.push(make_field(&commands, deadline.as_deref(), &mapped));
+        if let Ok(cmd) = Command::try_from(b) {
+            out.push(cmd);
         }
     }
-    fields
+    out
 }
+
+pub struct UniswapV4Visualizer {}
+
+impl UniswapV4Visualizer {
+    pub fn visualize_tx_commands(&self, input: &[u8]) -> Option<SignablePayloadField> {
+        if input.len() < 4 {
+            return None;
+        }
+        if let Ok(call) = IUniversalRouter::executeCall::abi_decode(input) {
+            let deadline_val: i64 = match call.deadline.try_into() {
+                Ok(val) => val,
+                Err(_) => return None,
+            };
+            let deadline = if deadline_val > 0 {
+                Utc.timestamp_opt(deadline_val, 0)
+                    .single()
+                    .map(|dt| dt.to_string())
+            } else {
+                None
+            };
+            let mapped = map_commands(&call.commands.0);
+            let mut detail_fields = Vec::new();
+
+            for (i, cmd) in mapped.iter().enumerate() {
+                let input_hex = call
+                    .inputs
+                    .get(i)
+                    .map(|b| format!("0x{}", hex::encode(&b.0)))
+                    .unwrap_or_else(|| "None".to_string()); // TODO: decode into readable values
+
+                detail_fields.push(SignablePayloadField::PreviewLayout {
+                    common: SignablePayloadFieldCommon {
+                        fallback_text: format!("{:?} input: {}", cmd, input_hex),
+                        label: format!("Command {}", i + 1),
+                    },
+                    preview_layout: visualsign::SignablePayloadFieldPreviewLayout {
+                        title: Some(visualsign::SignablePayloadFieldTextV2 {
+                            text: format!("{:?}", cmd),
+                        }),
+                        subtitle: Some(visualsign::SignablePayloadFieldTextV2 {
+                            text: format!("Input: {}", input_hex),
+                        }),
+                        condensed: None,
+                        expanded: None,
+                    },
+                });
+            }
+
+            // Deadline field (optional)
+            if let Some(dl) = &deadline {
+                detail_fields.push(SignablePayloadField::TextV2 {
+                    common: SignablePayloadFieldCommon {
+                        fallback_text: dl.clone(),
+                        label: "Deadline".to_string(),
+                    },
+                    text_v2: SignablePayloadFieldTextV2 { text: dl.clone() },
+                });
+            }
+
+            return Some(SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: if let Some(dl) = &deadline {
+                        format!(
+                            "Universal Router Execute: {} commands ({:?}), deadline {}",
+                            mapped.len(),
+                            mapped,
+                            dl
+                        )
+                    } else {
+                        format!(
+                            "Universal Router Execute: {} commands ({:?})",
+                            mapped.len(),
+                            mapped
+                        )
+                    },
+                    label: "Universal Router".to_string(),
+                },
+                preview_layout: visualsign::SignablePayloadFieldPreviewLayout {
+                    title: Some(visualsign::SignablePayloadFieldTextV2 {
+                        text: "Universal Router Execute".to_string(),
+                    }),
+                    subtitle: if let Some(dl) = &deadline {
+                        Some(visualsign::SignablePayloadFieldTextV2 {
+                            text: format!("{} commands, deadline {}", mapped.len(), dl),
+                        })
+                    } else {
+                        Some(visualsign::SignablePayloadFieldTextV2 {
+                            text: format!("{} commands", mapped.len()),
+                        })
+                    },
+                    condensed: None,
+                    expanded: Some(visualsign::SignablePayloadFieldListLayout {
+                        fields: detail_fields
+                            .into_iter()
+                            .map(|f| visualsign::AnnotatedPayloadField {
+                                signable_payload_field: f,
+                                static_annotation: None,
+                                dynamic_annotation: None,
+                            })
+                            .collect(),
+                    }),
+                },
+            });
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::Uint;
+    use alloy_primitives::{Bytes, U256};
+    use visualsign::{
+        AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldCommon,
+        SignablePayloadFieldListLayout, SignablePayloadFieldPreviewLayout,
+        SignablePayloadFieldTextV2,
+    };
 
-    #[test]
-    fn test_parse_universal_router_execute_invalid_selector() {
-        // Wrong selector, but parse_universal_router_execute just returns empty Vec
-        let input_data = vec![0x00, 0x00, 0x00, 0x00];
-        let fields = parse_universal_router_execute(&input_data);
-        assert!(fields.is_empty());
+    fn encode_execute_call(commands: &[u8], inputs: Vec<Vec<u8>>, deadline: u64) -> Vec<u8> {
+        let inputs_bytes = inputs.into_iter().map(Bytes::from).collect::<Vec<_>>();
+        IUniversalRouter::executeCall {
+            commands: Bytes::from(commands.to_vec()),
+            inputs: inputs_bytes,
+            deadline: U256::from(deadline),
+        }
+        .abi_encode()
     }
 
     #[test]
-    fn test_parse_universal_router_execute_too_short() {
-        // Less than 4 bytes
-        let input_data = vec![0x35, 0x93, 0x56];
-        let fields = parse_universal_router_execute(&input_data);
-        assert!(fields.is_empty());
+    fn test_visualize_tx_commands_empty_input() {
+        assert_eq!(UniswapV4Visualizer {}.visualize_tx_commands(&[]), None);
+        assert_eq!(
+            UniswapV4Visualizer {}.visualize_tx_commands(&[0x01, 0x02, 0x03]),
+            None
+        );
     }
 
     #[test]
-    fn test_parse_universal_router_execute_field_with_deadline() {
-        let commands: Vec<u8> = vec![
-            Command::V4Swap as u8,
+    fn test_visualize_tx_commands_invalid_deadline() {
+        // deadline is not convertible to i64 (u64::MAX)
+        let input = encode_execute_call(&[0x00], vec![vec![0x01, 0x02]], u64::MAX);
+        assert_eq!(UniswapV4Visualizer {}.visualize_tx_commands(&input), None);
+    }
+
+    #[test]
+    fn test_visualize_tx_commands_single_command_with_deadline() {
+        let commands = vec![Command::V3SwapExactIn as u8];
+        let inputs = vec![vec![0xde, 0xad, 0xbe, 0xef]];
+        let deadline = 1_700_000_000u64; // 2023-11-13T12:26:40Z
+        let input = encode_execute_call(&commands, inputs.clone(), deadline);
+
+        // Build expected field
+        let dt = chrono::Utc.timestamp_opt(deadline as i64, 0).unwrap();
+        let deadline_str = dt.to_string();
+
+        assert_eq!(
+            UniswapV4Visualizer {}
+                .visualize_tx_commands(&input)
+                .unwrap(),
+            SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: format!(
+                        "Universal Router Execute: 1 commands ([V3SwapExactIn]), deadline {}",
+                        deadline_str
+                    ),
+                    label: "Universal Router".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 {
+                        text: "Universal Router Execute".to_string(),
+                    }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: format!("1 commands, deadline {}", deadline_str),
+                    }),
+                    condensed: None,
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: vec![
+                            AnnotatedPayloadField {
+                                signable_payload_field: SignablePayloadField::PreviewLayout {
+                                    common: SignablePayloadFieldCommon {
+                                        fallback_text: "V3SwapExactIn input: 0xdeadbeef"
+                                            .to_string(),
+                                        label: "Command 1".to_string(),
+                                    },
+                                    preview_layout: SignablePayloadFieldPreviewLayout {
+                                        title: Some(SignablePayloadFieldTextV2 {
+                                            text: "V3SwapExactIn".to_string(),
+                                        }),
+                                        subtitle: Some(SignablePayloadFieldTextV2 {
+                                            text: "Input: 0xdeadbeef".to_string(),
+                                        }),
+                                        condensed: None,
+                                        expanded: None,
+                                    },
+                                },
+                                static_annotation: None,
+                                dynamic_annotation: None,
+                            },
+                            AnnotatedPayloadField {
+                                signable_payload_field: SignablePayloadField::TextV2 {
+                                    common: SignablePayloadFieldCommon {
+                                        fallback_text: deadline_str.clone(),
+                                        label: "Deadline".to_string(),
+                                    },
+                                    text_v2: SignablePayloadFieldTextV2 {
+                                        text: deadline_str.clone(),
+                                    },
+                                },
+                                static_annotation: None,
+                                dynamic_annotation: None,
+                            },
+                        ],
+                    }),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn test_visualize_tx_commands_multiple_commands_no_deadline() {
+        let commands = vec![
+            Command::V3SwapExactIn as u8,
             Command::Transfer as u8,
-            Command::Permit2Permit as u8,
+            Command::WrapEth as u8,
         ];
-        let inputs: Vec<Vec<u8>> = vec![];
-        let deadline = Uint::<256, 4>::from(1234567890);
-        let call = IUniversalRouter::executeCall {
-            commands: commands.clone().into(),
-            inputs: inputs.iter().map(|v| v.clone().into()).collect(),
-            deadline,
-        };
+        let inputs = vec![vec![0x01, 0x02], vec![0x03, 0x04, 0x05], vec![0x06]];
+        let deadline = 0u64;
+        let input = encode_execute_call(&commands, inputs.clone(), deadline);
 
-        let input_data = call.abi_encode();
-        let fields = parse_universal_router_execute(&input_data);
-        assert_eq!(fields.len(), 1);
-        if let SignablePayloadField::TextV2 { common, text_v2 } = &fields[0] {
-            assert_eq!(
-                "Universal Router Execute: 3 commands ([V4Swap, Transfer, Permit2Permit]), deadline 2009-02-13 23:31:30 UTC",
-                common.fallback_text
-            );
-            assert_eq!(
-                "Commands: [V4Swap, Transfer, Permit2Permit]\nDeadline: 2009-02-13 23:31:30 UTC",
-                text_v2.text
-            );
-        } else {
-            panic!("Expected TextV2 field");
-        }
+        assert_eq!(
+            UniswapV4Visualizer {}
+                .visualize_tx_commands(&input)
+                .unwrap(),
+            SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text:
+                        "Universal Router Execute: 3 commands ([V3SwapExactIn, Transfer, WrapEth])"
+                            .to_string(),
+                    label: "Universal Router".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 {
+                        text: "Universal Router Execute".to_string(),
+                    }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: "3 commands".to_string(),
+                    }),
+                    condensed: None,
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: vec![
+                            AnnotatedPayloadField {
+                                signable_payload_field: SignablePayloadField::PreviewLayout {
+                                    common: SignablePayloadFieldCommon {
+                                        fallback_text: "V3SwapExactIn input: 0x0102".to_string(),
+                                        label: "Command 1".to_string(),
+                                    },
+                                    preview_layout: SignablePayloadFieldPreviewLayout {
+                                        title: Some(SignablePayloadFieldTextV2 {
+                                            text: "V3SwapExactIn".to_string(),
+                                        }),
+                                        subtitle: Some(SignablePayloadFieldTextV2 {
+                                            text: "Input: 0x0102".to_string(),
+                                        }),
+                                        condensed: None,
+                                        expanded: None,
+                                    },
+                                },
+                                static_annotation: None,
+                                dynamic_annotation: None,
+                            },
+                            AnnotatedPayloadField {
+                                signable_payload_field: SignablePayloadField::PreviewLayout {
+                                    common: SignablePayloadFieldCommon {
+                                        fallback_text: "Transfer input: 0x030405".to_string(),
+                                        label: "Command 2".to_string(),
+                                    },
+                                    preview_layout: SignablePayloadFieldPreviewLayout {
+                                        title: Some(SignablePayloadFieldTextV2 {
+                                            text: "Transfer".to_string(),
+                                        }),
+                                        subtitle: Some(SignablePayloadFieldTextV2 {
+                                            text: "Input: 0x030405".to_string(),
+                                        }),
+                                        condensed: None,
+                                        expanded: None,
+                                    },
+                                },
+                                static_annotation: None,
+                                dynamic_annotation: None,
+                            },
+                            AnnotatedPayloadField {
+                                signable_payload_field: SignablePayloadField::PreviewLayout {
+                                    common: SignablePayloadFieldCommon {
+                                        fallback_text: "WrapEth input: 0x06".to_string(),
+                                        label: "Command 3".to_string(),
+                                    },
+                                    preview_layout: SignablePayloadFieldPreviewLayout {
+                                        title: Some(SignablePayloadFieldTextV2 {
+                                            text: "WrapEth".to_string(),
+                                        }),
+                                        subtitle: Some(SignablePayloadFieldTextV2 {
+                                            text: "Input: 0x06".to_string(),
+                                        }),
+                                        condensed: None,
+                                        expanded: None,
+                                    },
+                                },
+                                static_annotation: None,
+                                dynamic_annotation: None,
+                            },
+                        ],
+                    }),
+                },
+            }
+        );
     }
 
     #[test]
-    fn test_parse_universal_router_execute_field_without_deadline() {
-        let commands: Vec<u8> = vec![Command::V3SwapExactIn as u8, Command::Transfer as u8];
-        let inputs: Vec<Vec<u8>> = vec![];
-        let call = IUniversalRouter::executeCall {
-            commands: commands.clone().into(),
-            inputs: inputs.iter().map(|v| v.clone().into()).collect(),
-            deadline: Uint::<256, 4>::from(0),
-        };
-        let input_data = call.abi_encode();
-        let fields = parse_universal_router_execute(&input_data);
-        assert_eq!(fields.len(), 1);
-        if let SignablePayloadField::TextV2 { common, text_v2 } = &fields[0] {
-            assert_eq!(
-                "Universal Router Execute: 2 commands ([V3SwapExactIn, Transfer])",
-                common.fallback_text
-            );
-            assert_eq!("Commands: [V3SwapExactIn, Transfer]", text_v2.text);
-        } else {
-            panic!("Expected TextV2 field");
-        }
+    fn test_visualize_tx_commands_command_without_input() {
+        // Only one command, but no input for it
+        let commands = vec![Command::Sweep as u8];
+        let inputs = vec![]; // No input
+        let deadline = 1_700_000_000u64;
+        let input = encode_execute_call(&commands, inputs.clone(), deadline);
+
+        let dt = chrono::Utc.timestamp_opt(deadline as i64, 0).unwrap();
+        let deadline_str = dt.to_string();
+
+        assert_eq!(
+            UniswapV4Visualizer {}
+                .visualize_tx_commands(&input)
+                .unwrap(),
+            SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: format!(
+                        "Universal Router Execute: 1 commands ([Sweep]), deadline {}",
+                        deadline_str
+                    ),
+                    label: "Universal Router".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 {
+                        text: "Universal Router Execute".to_string(),
+                    }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: format!("1 commands, deadline {}", deadline_str),
+                    }),
+                    condensed: None,
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: vec![
+                            AnnotatedPayloadField {
+                                signable_payload_field: SignablePayloadField::PreviewLayout {
+                                    common: SignablePayloadFieldCommon {
+                                        fallback_text: "Sweep input: None".to_string(),
+                                        label: "Command 1".to_string(),
+                                    },
+                                    preview_layout: SignablePayloadFieldPreviewLayout {
+                                        title: Some(SignablePayloadFieldTextV2 {
+                                            text: "Sweep".to_string(),
+                                        }),
+                                        subtitle: Some(SignablePayloadFieldTextV2 {
+                                            text: "Input: None".to_string(),
+                                        }),
+                                        condensed: None,
+                                        expanded: None,
+                                    },
+                                },
+                                static_annotation: None,
+                                dynamic_annotation: None,
+                            },
+                            AnnotatedPayloadField {
+                                signable_payload_field: SignablePayloadField::TextV2 {
+                                    common: SignablePayloadFieldCommon {
+                                        fallback_text: deadline_str.clone(),
+                                        label: "Deadline".to_string(),
+                                    },
+                                    text_v2: SignablePayloadFieldTextV2 {
+                                        text: deadline_str.clone(),
+                                    },
+                                },
+                                static_annotation: None,
+                                dynamic_annotation: None,
+                            },
+                        ],
+                    }),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn test_visualize_tx_commands_unrecognized_command() {
+        // 0xff is not a valid Command, so it should be skipped
+        let commands = vec![0xff, Command::Transfer as u8];
+        let inputs = vec![vec![0x01], vec![0x02]];
+        let deadline = 0u64;
+        let input = encode_execute_call(&commands, inputs.clone(), deadline);
+
+        assert_eq!(
+            UniswapV4Visualizer {}
+                .visualize_tx_commands(&input)
+                .unwrap(),
+            SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: "Universal Router Execute: 1 commands ([Transfer])".to_string(),
+                    label: "Universal Router".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 {
+                        text: "Universal Router Execute".to_string(),
+                    }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: "1 commands".to_string(),
+                    }),
+                    condensed: None,
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: vec![AnnotatedPayloadField {
+                            signable_payload_field: SignablePayloadField::PreviewLayout {
+                                common: SignablePayloadFieldCommon {
+                                    fallback_text: "Transfer input: 0x01".to_string(),
+                                    label: "Command 1".to_string(),
+                                },
+                                preview_layout: SignablePayloadFieldPreviewLayout {
+                                    title: Some(SignablePayloadFieldTextV2 {
+                                        text: "Transfer".to_string(),
+                                    }),
+                                    subtitle: Some(SignablePayloadFieldTextV2 {
+                                        text: "Input: 0x01".to_string(),
+                                    }),
+                                    condensed: None,
+                                    expanded: None,
+                                },
+                            },
+                            static_annotation: None,
+                            dynamic_annotation: None,
+                        }],
+                    }),
+                },
+            }
+        );
     }
 }
