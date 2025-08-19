@@ -4,8 +4,8 @@ use sui_json_rpc_types::{
     SuiTransactionBlockData, SuiTransactionBlockDataAPI, SuiTransactionBlockKind,
 };
 
-use visualsign::errors::VisualSignError;
 use visualsign::AnnotatedPayloadField;
+use visualsign::errors::VisualSignError;
 
 include!(concat!(env!("OUT_DIR"), "/generated_visualizers.rs"));
 

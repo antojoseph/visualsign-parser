@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use sui_json_rpc_types::{SuiCallArg, SuiCommand};
 use sui_types::base_types::SuiAddress;
 
-use ::visualsign::errors::VisualSignError;
 use ::visualsign::AnnotatedPayloadField;
+use ::visualsign::errors::VisualSignError;
 pub use visualsign::{
     SuiTransactionWrapper, SuiVisualSignConverter, transaction_string_to_visual_sign,
     transaction_to_visual_sign,
