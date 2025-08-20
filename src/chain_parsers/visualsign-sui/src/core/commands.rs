@@ -4,8 +4,8 @@ use sui_json_rpc_types::{
     SuiTransactionBlockData, SuiTransactionBlockDataAPI, SuiTransactionBlockKind,
 };
 
-use visualsign::errors::VisualSignError;
 use visualsign::AnnotatedPayloadField;
+use visualsign::errors::VisualSignError;
 
 include!(concat!(env!("OUT_DIR"), "/generated_visualizers.rs"));
 
@@ -33,7 +33,8 @@ pub fn decode_commands(
             )
         })
         .map(|res| res.map(|viz_result| viz_result.field))
-        .collect()
+        .collect::<Result<Vec<Vec<AnnotatedPayloadField>>, _>>()
+        .map(|nested| nested.into_iter().flatten().collect())
 }
 
 pub fn decode_transfers(
@@ -56,7 +57,8 @@ pub fn decode_transfers(
             )
         })
         .map(|res| res.map(|viz_result| viz_result.field))
-        .collect()
+        .collect::<Result<Vec<Vec<AnnotatedPayloadField>>, _>>()
+        .map(|nested| nested.into_iter().flatten().collect())
 }
 
 #[cfg(test)]

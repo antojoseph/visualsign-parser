@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use sui_json_rpc_types::{SuiCallArg, SuiCommand};
 use sui_types::base_types::SuiAddress;
 
-use ::visualsign::errors::VisualSignError;
 use ::visualsign::AnnotatedPayloadField;
+use ::visualsign::errors::VisualSignError;
 pub use visualsign::{
     SuiTransactionWrapper, SuiVisualSignConverter, transaction_string_to_visual_sign,
     transaction_to_visual_sign,
@@ -111,7 +111,7 @@ pub trait CommandVisualizer {
     fn visualize_tx_commands(
         &self,
         context: &VisualizerContext,
-    ) -> Result<AnnotatedPayloadField, VisualSignError>;
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError>;
 
     /// Returns the config for the visualizer.
     fn get_config(&self) -> Option<&dyn SuiIntegrationConfig>;
@@ -137,7 +137,7 @@ pub trait CommandVisualizer {
 /// Result of a successful visualization attempt, including which visualizer handled it.
 #[derive(Debug, Clone)]
 pub struct VisualizeResult {
-    pub field: AnnotatedPayloadField,
+    pub field: Vec<AnnotatedPayloadField>,
     pub kind: VisualizerKind,
 }
 
