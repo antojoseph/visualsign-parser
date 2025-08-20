@@ -73,13 +73,6 @@ impl CoinObject {
             CoinObject::UnknownObject(_) => "Unknown".to_string(),
         }
     }
-
-    // pub fn get_identifier(&self) -> String {
-    //     match self {
-    //         CoinObject::Sui => SuiArgument::GasCoin.to_string(),
-    //         CoinObject::UnknownObject(identifier) => SuiObjectArg::
-    //     }
-    // }
 }
 
 impl Default for CoinObject {
