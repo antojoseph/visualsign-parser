@@ -248,15 +248,20 @@ fn convert_to_visual_sign_payload(
     // Add contract call data if present
     let input = transaction.input();
     if !input.is_empty() {
-        fields.push(SignablePayloadField::TextV2 {
-            common: SignablePayloadFieldCommon {
-                fallback_text: format!("0x{}", hex::encode(input)),
-                label: "Input Data".to_string(),
-            },
-            text_v2: SignablePayloadFieldTextV2 {
-                text: format!("0x{}", hex::encode(input)),
-            },
-        });
+        let address = transaction.to().or_else(|| None);
+        if let Some(field) = registry::try_visualize_commands(chain_id, address, &input) {
+            fields.push(field);
+        } else {
+            fields.push(SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: format!("0x{}", hex::encode(input)),
+                    label: "Input Data".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: format!("0x{}", hex::encode(input)),
+                },
+            });
+        }
     }
 
     let title = options

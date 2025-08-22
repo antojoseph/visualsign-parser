@@ -1,6 +1,88 @@
-// Generated compile-time data (GenField, GenFormat, SELECTOR_MAP)
 include!(concat!(env!("OUT_DIR"), "/erc7730_registry_gen.rs"));
+use alloy_primitives::Address;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Once},
+};
 use visualsign::{SignablePayloadField, SignablePayloadFieldCommon, SignablePayloadFieldTextV2};
+
+/// Context passed to visualizers for higher-level command rendering
+#[derive(Debug)]
+pub struct VisualizerContext<'a> {
+    pub chain_id: Option<u64>,
+    pub to: Option<Address>,
+    pub calldata: &'a [u8],
+}
+
+/// Trait for contract-specific visualizers. Implementations should attempt to produce
+/// a higher-level SignablePayloadField (e.g. a PreviewLayout summarizing commands) or return None.
+pub trait CommandVisualizer: Send + Sync + 'static {
+    fn visualize_tx_commands(&self, context: &VisualizerContext) -> Option<SignablePayloadField>;
+}
+
+type DynVisualizer = Arc<dyn CommandVisualizer>;
+static INIT: Once = Once::new();
+// Top-level map: chain_id (Some or None for chain-agnostic) -> address -> visualizer
+static mut COMMAND_REGISTRY_PTR: *mut HashMap<Option<u64>, HashMap<Address, DynVisualizer>> =
+    std::ptr::null_mut();
+
+#[inline]
+fn ensure_init() {
+    INIT.call_once(|| unsafe {
+        let boxed: Box<HashMap<Option<u64>, HashMap<Address, DynVisualizer>>> =
+            Box::new(HashMap::new());
+        COMMAND_REGISTRY_PTR = Box::into_raw(boxed);
+    });
+}
+
+/// Register a visualizer for (chain_id,address). Use chain_id None for chain-agnostic fallback.
+pub fn register_visualizer(chain_id: Option<u64>, address: Address, visualizer: DynVisualizer) {
+    ensure_init();
+    unsafe {
+        let top = &mut *COMMAND_REGISTRY_PTR;
+        top.entry(chain_id)
+            .or_insert_with(HashMap::new)
+            .insert(address, visualizer);
+    }
+}
+
+/// Lookup a visualizer. Attempts exact (chain_id,address) then (None,address).
+pub fn get_visualizer(chain_id: Option<u64>, address: Address) -> Option<DynVisualizer> {
+    ensure_init();
+    unsafe {
+        if COMMAND_REGISTRY_PTR.is_null() {
+            return None;
+        }
+        let top = &*COMMAND_REGISTRY_PTR;
+        if let Some(m) = top.get(&chain_id) {
+            if let Some(v) = m.get(&address) {
+                return Some(v.clone());
+            }
+        }
+        // Fallback to chain-agnostic (None)
+        if let Some(m_any) = top.get(&None) {
+            if let Some(v) = m_any.get(&address) {
+                return Some(v.clone());
+            }
+        }
+        None
+    }
+}
+
+/// Convenience: try to visualize using any registered visualizer; returns the produced field or None.
+pub fn try_visualize_commands(
+    chain_id: Option<u64>,
+    to: Option<Address>,
+    calldata: &[u8],
+) -> Option<SignablePayloadField> {
+    let to_addr = to?; // need a concrete address for lookup
+    let v = get_visualizer(chain_id, to_addr)?;
+    v.visualize_tx_commands(&VisualizerContext {
+        chain_id,
+        to,
+        calldata,
+    })
+}
 
 /// Given calldata bytes, attempt to produce SignablePayloadFields using the registry.
 /// Current implementation is heuristic and does not ABI-decode parameters; it surfaces field

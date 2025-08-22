@@ -1,30 +1,27 @@
-use crate::registry;
-use visualsign::{SignablePayload, SignablePayloadField};
-use crate::decode_transaction_bytes; // reuse low-level decoder
-use alloy_consensus::Transaction as _; // bring trait into scope for .input()
+use crate::registry::{CommandVisualizer, VisualizerContext, decode_calldata};
+use visualsign::{SignablePayloadField, SignablePayloadFieldCommon, SignablePayloadFieldTextV2};
 
-/// Decode a raw Ethereum transaction (RLP bytes) into SignablePayloadFields using the
-/// embedded ERC-7730 registry. Returns None if decoding fails or no registry match.
-pub fn decode_raw_transaction_to_fields(raw: &[u8]) -> Option<Vec<SignablePayloadField>> {
-	let tx = decode_transaction_bytes(raw).ok()?;
-	// Only legacy and EIP-1559 currently supported for calldata extraction here
-	let input: Vec<u8> = match &tx {
-		alloy_consensus::TypedTransaction::Legacy(t) => t.input().to_vec(),
-		alloy_consensus::TypedTransaction::Eip1559(t) => t.input().to_vec(),
-		_ => return None,
-	};
-	if input.is_empty() { return None; }
-	registry::decode_calldata(&input)
-}
+pub struct Eip7730Visualizer;
 
-/// Convenience function building a SignablePayload with fields derived from registry.
-pub fn decode_raw_transaction_to_payload(raw: &[u8]) -> Option<SignablePayload> {
-	let fields = decode_raw_transaction_to_fields(raw)?;
-	Some(SignablePayload {
-		fields,
-		payload_type: "ethereum_tx".to_string(),
-		subtitle: None,
-		title: "Ethereum Transaction".to_string(),
-		version: "1".to_string(),
-	})
+impl CommandVisualizer for Eip7730Visualizer {
+    fn visualize_tx_commands(&self, context: &VisualizerContext) -> Option<SignablePayloadField> {
+        let decoded = decode_calldata(context.calldata)?;
+        if decoded.is_empty() {
+            return None;
+        }
+        if decoded.len() == 1 {
+            // A single decoded field is already suitably granular.
+            return Some(decoded.into_iter().next().unwrap());
+        }
+        // Summarize multiple decoded fields by listing their labels.
+        let labels: Vec<String> = decoded.iter().map(|f| f.label().to_string()).collect();
+        let summary_text = format!("Decoded Input Fields: {}", labels.join(", "));
+        Some(SignablePayloadField::TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: summary_text.clone(),
+                label: "Decoded Input".to_string(),
+            },
+            text_v2: SignablePayloadFieldTextV2 { text: summary_text },
+        })
+    }
 }
