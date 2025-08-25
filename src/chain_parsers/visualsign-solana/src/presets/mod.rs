@@ -1,7 +1,7 @@
+pub mod associated_token_account;
+pub mod compute_budget;
 pub mod jupiter;
 pub mod system;
-pub mod compute_budget;
-pub mod associated_token_account;
 
 use crate::core::InstructionVisualizer;
 

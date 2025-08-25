@@ -1,10 +1,13 @@
 //! System program preset for Solana
 
-use crate::core::{InstructionVisualizer, SolanaIntegrationConfig, SolanaIntegrationConfigData, VisualizerContext, VisualizerKind};
-use std::collections::HashMap;
+use crate::core::{
+    InstructionVisualizer, SolanaIntegrationConfig, SolanaIntegrationConfigData, VisualizerContext,
+    VisualizerKind,
+};
 use solana_program::system_instruction::SystemInstruction;
-use visualsign::{AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldCommon};
+use std::collections::HashMap;
 use visualsign::errors::VisualSignError;
+use visualsign::{AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldCommon};
 
 // Create a static instance that we can reference
 static SYSTEM_CONFIG: SystemConfig = SystemConfig;
@@ -35,15 +38,22 @@ impl InstructionVisualizer for SystemVisualizer {
         &self,
         context: &VisualizerContext,
     ) -> Result<AnnotatedPayloadField, VisualSignError> {
-        let instruction = context.current_instruction()
+        let instruction = context
+            .current_instruction()
             .ok_or_else(|| VisualSignError::MissingData("No instruction found".into()))?;
 
         // Try to parse as system instruction
         let system_instruction = bincode::deserialize::<SystemInstruction>(&instruction.data)
-            .map_err(|e| VisualSignError::DecodeError(format!("Failed to parse system instruction: {}", e)))?;
+            .map_err(|e| {
+                VisualSignError::DecodeError(format!("Failed to parse system instruction: {}", e))
+            })?;
 
         // Generate proper preview layout
-        Ok(create_system_preview_layout(&system_instruction, instruction, context)?)
+        Ok(create_system_preview_layout(
+            &system_instruction,
+            instruction,
+            context,
+        )?)
     }
 
     fn get_config(&self) -> Option<&dyn SolanaIntegrationConfig> {
@@ -64,35 +74,59 @@ fn create_system_preview_layout(
 
     match instruction {
         SystemInstruction::Transfer { lamports } => {
-            let from_key = solana_instruction.accounts.get(0)
+            let from_key = solana_instruction
+                .accounts
+                .get(0)
                 .map(|meta| meta.pubkey.to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
-            let to_key = solana_instruction.accounts.get(1)
+            let to_key = solana_instruction
+                .accounts
+                .get(1)
                 .map(|meta| meta.pubkey.to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
 
             let condensed_fields = vec![
                 create_text_field("Action", "Transfer SOL")?,
-                create_text_field("Amount", &format!("{} SOL", (*lamports as f64) / 1_000_000_000.0))?,
-                create_text_field("From", &format!("{}...{}", &from_key[..8], &from_key[from_key.len()-8..]))?,
-                create_text_field("To", &format!("{}...{}", &to_key[..8], &to_key[to_key.len()-8..]))?,
+                create_text_field(
+                    "Amount",
+                    &format!("{} SOL", (*lamports as f64) / 1_000_000_000.0),
+                )?,
+                create_text_field(
+                    "From",
+                    &format!("{}...{}", &from_key[..8], &from_key[from_key.len() - 8..]),
+                )?,
+                create_text_field(
+                    "To",
+                    &format!("{}...{}", &to_key[..8], &to_key[to_key.len() - 8..]),
+                )?,
             ];
 
             let expanded_fields = vec![
                 create_text_field("Action", "Transfer SOL")?,
                 create_number_field("Amount (lamports)", &lamports.to_string(), "")?,
-                create_text_field("Amount (SOL)", &format!("{}", (*lamports as f64) / 1_000_000_000.0))?,
+                create_text_field(
+                    "Amount (SOL)",
+                    &format!("{}", (*lamports as f64) / 1_000_000_000.0),
+                )?,
                 create_text_field("From Account", &from_key)?,
                 create_text_field("To Account", &to_key)?,
                 create_text_field("Program", "System Program")?,
             ];
 
-            let condensed = visualsign::SignablePayloadFieldListLayout { fields: condensed_fields };
-            let expanded = visualsign::SignablePayloadFieldListLayout { fields: expanded_fields };
+            let condensed = visualsign::SignablePayloadFieldListLayout {
+                fields: condensed_fields,
+            };
+            let expanded = visualsign::SignablePayloadFieldListLayout {
+                fields: expanded_fields,
+            };
 
             let preview_layout = visualsign::SignablePayloadFieldPreviewLayout {
-                title: Some(visualsign::SignablePayloadFieldTextV2 { text: "System Transfer".to_string() }),
-                subtitle: Some(visualsign::SignablePayloadFieldTextV2 { text: String::new() }),
+                title: Some(visualsign::SignablePayloadFieldTextV2 {
+                    text: "System Transfer".to_string(),
+                }),
+                subtitle: Some(visualsign::SignablePayloadFieldTextV2 {
+                    text: String::new(),
+                }),
                 condensed: Some(condensed),
                 expanded: Some(expanded),
             };
@@ -103,24 +137,38 @@ fn create_system_preview_layout(
                 signable_payload_field: SignablePayloadField::PreviewLayout {
                     common: SignablePayloadFieldCommon {
                         label: format!("Instruction {}", context.instruction_index() + 1),
-                        fallback_text: format!("Transfer {} SOL", (*lamports as f64) / 1_000_000_000.0),
+                        fallback_text: format!(
+                            "Transfer {} SOL",
+                            (*lamports as f64) / 1_000_000_000.0
+                        ),
                     },
                     preview_layout,
                 },
             })
-        },
-        SystemInstruction::CreateAccount { lamports, space, owner } => {
-            let new_account = solana_instruction.accounts.get(1)
+        }
+        SystemInstruction::CreateAccount {
+            lamports,
+            space,
+            owner,
+        } => {
+            let new_account = solana_instruction
+                .accounts
+                .get(1)
                 .map(|meta| meta.pubkey.to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
-            let payer = solana_instruction.accounts.get(0)
+            let payer = solana_instruction
+                .accounts
+                .get(0)
                 .map(|meta| meta.pubkey.to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
 
             let condensed_fields = vec![
                 create_text_field("Action", "Create Account")?,
                 create_text_field("Space", &format!("{} bytes", space))?,
-                create_text_field("Rent", &format!("{} SOL", (*lamports as f64) / 1_000_000_000.0))?,
+                create_text_field(
+                    "Rent",
+                    &format!("{} SOL", (*lamports as f64) / 1_000_000_000.0),
+                )?,
             ];
 
             let expanded_fields = vec![
@@ -129,17 +177,28 @@ fn create_system_preview_layout(
                 create_text_field("Payer", &payer)?,
                 create_number_field("Space (bytes)", &space.to_string(), "")?,
                 create_number_field("Rent (lamports)", &lamports.to_string(), "")?,
-                create_text_field("Rent (SOL)", &format!("{}", (*lamports as f64) / 1_000_000_000.0))?,
+                create_text_field(
+                    "Rent (SOL)",
+                    &format!("{}", (*lamports as f64) / 1_000_000_000.0),
+                )?,
                 create_text_field("Owner Program", &owner.to_string())?,
                 create_text_field("Program", "System Program")?,
             ];
 
-            let condensed = visualsign::SignablePayloadFieldListLayout { fields: condensed_fields };
-            let expanded = visualsign::SignablePayloadFieldListLayout { fields: expanded_fields };
+            let condensed = visualsign::SignablePayloadFieldListLayout {
+                fields: condensed_fields,
+            };
+            let expanded = visualsign::SignablePayloadFieldListLayout {
+                fields: expanded_fields,
+            };
 
             let preview_layout = visualsign::SignablePayloadFieldPreviewLayout {
-                title: Some(visualsign::SignablePayloadFieldTextV2 { text: "Create Account".to_string() }),
-                subtitle: Some(visualsign::SignablePayloadFieldTextV2 { text: String::new() }),
+                title: Some(visualsign::SignablePayloadFieldTextV2 {
+                    text: "Create Account".to_string(),
+                }),
+                subtitle: Some(visualsign::SignablePayloadFieldTextV2 {
+                    text: String::new(),
+                }),
                 condensed: Some(condensed),
                 expanded: Some(expanded),
             };
@@ -155,7 +214,7 @@ fn create_system_preview_layout(
                     preview_layout,
                 },
             })
-        },
+        }
         _ => {
             // Handle other system instructions with basic layout
             let instruction_name = match instruction {
@@ -184,12 +243,20 @@ fn create_system_preview_layout(
                 create_text_field("Instruction Data", &format!("{:?}", instruction))?,
             ];
 
-            let condensed = visualsign::SignablePayloadFieldListLayout { fields: condensed_fields };
-            let expanded = visualsign::SignablePayloadFieldListLayout { fields: expanded_fields };
+            let condensed = visualsign::SignablePayloadFieldListLayout {
+                fields: condensed_fields,
+            };
+            let expanded = visualsign::SignablePayloadFieldListLayout {
+                fields: expanded_fields,
+            };
 
             let preview_layout = visualsign::SignablePayloadFieldPreviewLayout {
-                title: Some(visualsign::SignablePayloadFieldTextV2 { text: instruction_name.to_string() }),
-                subtitle: Some(visualsign::SignablePayloadFieldTextV2 { text: String::new() }),
+                title: Some(visualsign::SignablePayloadFieldTextV2 {
+                    text: instruction_name.to_string(),
+                }),
+                subtitle: Some(visualsign::SignablePayloadFieldTextV2 {
+                    text: String::new(),
+                }),
                 condensed: Some(condensed),
                 expanded: Some(expanded),
             };
