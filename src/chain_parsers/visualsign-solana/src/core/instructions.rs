@@ -1,9 +1,7 @@
 use crate::core::{InstructionVisualizer, VisualizerContext, visualize_with_any};
-use solana_parser::solana::parser::parse_transaction;
 use solana_parser::solana::structs::SolanaAccount;
-//use solana_parser::solana::parser::SolanaTransaction;
 use solana_sdk::transaction::Transaction as SolanaTransaction;
-use solana_sdk::instruction::Instruction; // <-- Add this import
+use solana_sdk::instruction::Instruction;
 
 use visualsign::AnnotatedPayloadField;
 use visualsign::errors::VisualSignError;
@@ -19,36 +17,38 @@ pub fn decode_instructions(
     let visualizers_refs: Vec<&dyn InstructionVisualizer> =
         visualizers.iter().map(|v| v.as_ref()).collect::<Vec<_>>();
 
-    // this clone is probably unneccessary - todo revisit and switch to borrow
-    let message_clone = transaction.message.clone();
-    let parsed_transaction = parse_transaction(
-        hex::encode(message_clone.serialize()),
-        false, /* because we're passing the message only */
-    )
-    .expect("Failed to parse transaction");
+    let message = &transaction.message;
+    let account_keys = &message.account_keys;
 
-    message_clone
+    // Convert compiled instructions to full instructions
+    let instructions: Vec<Instruction> = message
         .instructions
         .iter()
+        .map(|ci| Instruction {
+            program_id: account_keys[ci.program_id_index as usize],
+            accounts: ci
+                .accounts
+                .iter()
+                .map(|&i| solana_sdk::instruction::AccountMeta::new_readonly(account_keys[i as usize], false))
+                .collect(),
+            data: ci.data.clone(),
+        })
+        .collect();
+
+    instructions
+        .iter()
         .enumerate()
-        .filter_map(|(command_index, instruction)| {
+        .filter_map(|(instruction_index, _)| {
+            // Create sender account from first account key (typically the fee payer)
+            let sender = SolanaAccount {
+                account_key: account_keys[0].to_string(),
+                signer: false,
+                writable: false,
+            };
+
             visualize_with_any(
                 &visualizers_refs,
-                &VisualizerContext::new(
-                    &SolanaAccount { account_key: message_clone.account_keys[0].to_string(), signer: false, writable: false }, // Construct SolanaAccount directly
-                    command_index,
-                    &message_clone
-                        .instructions
-                        .iter()
-                        .map(|ci| {
-                            Instruction {
-                                program_id: message_clone.account_keys[ci.program_id_index as usize],
-                                accounts: ci.accounts.iter().map(|&i| message_clone.account_keys[i as usize]).collect(),
-                                data: ci.data.clone(),
-                            }
-                        })
-                        .collect::<Vec<_>>(), // Manually convert CompiledInstruction to Instruction
-                ),
+                &VisualizerContext::new(&sender, instruction_index, &instructions),
             )
         })
         .map(|res| res.map(|viz_result| viz_result.field))
@@ -56,7 +56,7 @@ pub fn decode_instructions(
 }
 
 pub fn decode_transfers(
-    block_data: &SolanaTransaction,
+    _block_data: &SolanaTransaction,
 ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
     Ok([].into())
 }

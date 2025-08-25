@@ -4,10 +4,12 @@ use ::visualsign::AnnotatedPayloadField;
 use ::visualsign::errors::VisualSignError;
 use solana_parser::solana::structs::SolanaAccount;
 use solana_sdk::instruction::Instruction;
-use tracing;
 
 mod instructions;
 mod visualsign;
+
+pub use instructions::*;
+pub use visualsign::*;
 
 /// Identifier for which visualizer handled a command, categorized by dApp type. - Copied from Sui chain_parser
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,12 +153,8 @@ pub fn visualize_with_any(
             return None;
         }
 
-        tracing::debug!(
-            "Handling command {:?} with visualizer {:?}",
-            context
-                .commands()
-                .get(context.command_index())
-                .map(|c| c.to_string()),
+        println!("Handling instruction {} with visualizer {:?}",
+            context.instruction_index(),
             v.kind()
         );
 
