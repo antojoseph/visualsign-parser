@@ -1,2 +1,1 @@
-mod jupiter;
 mod system;

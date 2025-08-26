@@ -2365,4 +2365,3 @@ mod tests {
         assert_eq!(usdc.decimals, 6);
     }
 }
-*/
