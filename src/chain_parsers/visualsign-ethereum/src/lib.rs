@@ -297,7 +297,6 @@ fn convert_to_visual_sign_payload(
                     provider::json_abi::parse_json_abi_input(input.clone(), &abi.value)
                 {
                     input_fields.extend(decoded_fields);
-                    // TODO: if abi signature is provided add to signable payload
                 }
             }
         }
