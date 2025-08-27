@@ -153,7 +153,7 @@ pub fn visualize_with_any(
             return None;
         }
 
-        println!(
+        eprintln!(
             "Handling instruction {} with visualizer {:?}",
             context.instruction_index(),
             v.kind()

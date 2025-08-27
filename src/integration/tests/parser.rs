@@ -1,4 +1,3 @@
-use base64::Engine;
 use generated::health::{AppHealthRequest, AppHealthResponse};
 use generated::parser::{Chain, ParseRequest};
 use integration::TestArgs;
@@ -124,10 +123,10 @@ async fn parser_solana_native_transfer_e2e() {
 
         // If the function is in a different module, update the import path accordingly.
         // For example, if it's in visualsign_solana::utils:
-        let solana_tx =
-            visualsign_solana::utils::create_transaction_with_empty_signatures(
-                solana_transfer_message,
-            );
+        let solana_tx = visualsign_solana::utils::create_transaction_with_empty_signatures(
+            solana_transfer_message,
+        );
+        println!("Solana transaction: {}", solana_tx);
         let parse_request = ParseRequest {
             unsigned_payload: solana_tx,
             chain: Chain::Solana as i32,
