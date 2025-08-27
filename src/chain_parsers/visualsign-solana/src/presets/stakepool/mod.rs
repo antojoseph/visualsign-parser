@@ -3,8 +3,7 @@
 mod config;
 
 use crate::core::{
-    InstructionVisualizer, SolanaIntegrationConfig, VisualizerContext,
-    VisualizerKind,
+    InstructionVisualizer, SolanaIntegrationConfig, VisualizerContext, VisualizerKind,
 };
 use config::StakepoolConfig;
 use spl_stake_pool::instruction::StakePoolInstruction;
