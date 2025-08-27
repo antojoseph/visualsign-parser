@@ -1,11 +1,13 @@
 //! System program preset for Solana
 
+mod config;
+
 use crate::core::{
-    InstructionVisualizer, SolanaIntegrationConfig, SolanaIntegrationConfigData, VisualizerContext,
+    InstructionVisualizer, SolanaIntegrationConfig, VisualizerContext,
     VisualizerKind,
 };
+use config::SystemConfig;
 use solana_program::system_instruction::SystemInstruction;
-use std::collections::HashMap;
 use visualsign::errors::VisualSignError;
 use visualsign::{
     AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldAmountV2,
@@ -14,25 +16,6 @@ use visualsign::{
 
 // Create a static instance that we can reference
 static SYSTEM_CONFIG: SystemConfig = SystemConfig;
-
-pub struct SystemConfig;
-
-impl SolanaIntegrationConfig for SystemConfig {
-    fn new() -> Self {
-        Self
-    }
-
-    fn data(&self) -> &SolanaIntegrationConfigData {
-        static DATA: std::sync::OnceLock<SolanaIntegrationConfigData> = std::sync::OnceLock::new();
-        DATA.get_or_init(|| {
-            let mut programs = HashMap::new();
-            let mut system_instructions = HashMap::new();
-            system_instructions.insert("*", vec!["*"]);
-            programs.insert("11111111111111111111111111111111", system_instructions);
-            SolanaIntegrationConfigData { programs }
-        })
-    }
-}
 
 pub struct SystemVisualizer;
 

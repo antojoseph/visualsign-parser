@@ -143,19 +143,19 @@ fn parse_jupiter_swap_instruction(
 
     match discriminator {
         // Real-world Jupiter swap discriminator from production data
-        [0xc1, 0x20, 0x9b, 0x33, 0x41, 0xd6, 0x9c, 0x81] => {
+        JUPITER_ROUTE_DISCRIMINATOR => {
             parse_jupiter_route_instruction(data, accounts)
         }
         // Route instruction discriminator: 0xe517cb977ae3ad2a
-        [0x2a, 0xad, 0xe3, 0x7a, 0x97, 0xcb, 0x17, 0xe5] => {
+        JUPITER_ROUTE_ALT_DISCRIMINATOR => {
             parse_jupiter_route_instruction(data, accounts)
         }
         // ExactOutRoute instruction discriminator: 0x4bd7dfa80cd0b62a
-        [0x2a, 0xb6, 0xd0, 0x0c, 0xa8, 0xdf, 0xd7, 0x4b] => {
+        JUPITER_EXACT_OUT_ROUTE_DISCRIMINATOR => {
             parse_jupiter_exact_out_route_instruction(data, accounts)
         }
         // SharedAccountsRoute instruction discriminator: 0x3af2aaae2fb6d42a
-        [0x2a, 0xd4, 0xb6, 0x2f, 0xae, 0xaa, 0xf2, 0x3a] => {
+        JUPITER_SHARED_ACCOUNTS_ROUTE_DISCRIMINATOR => {
             parse_jupiter_shared_accounts_route_instruction(data, accounts)
         }
         _ => Ok(JupiterSwapInstruction::Unknown),
@@ -170,27 +170,11 @@ fn parse_jupiter_route_instruction(
         return Err("Route instruction data too short");
     }
 
-    // Parse amounts from instruction data
-    let in_amount = u64::from_le_bytes([
-        data[data.len() - 16],
-        data[data.len() - 15],
-        data[data.len() - 14],
-        data[data.len() - 13],
-        data[data.len() - 12],
-        data[data.len() - 11],
-        data[data.len() - 10],
-        data[data.len() - 9],
-    ]);
-    let quoted_out_amount = u64::from_le_bytes([
-        data[data.len() - 8],
-        data[data.len() - 7],
-        data[data.len() - 6],
-        data[data.len() - 5],
-        data[data.len() - 4],
-        data[data.len() - 3],
-        data[data.len() - 2],
-        data[data.len() - 1],
-    ]);
+    // Parse amounts from instruction data using a struct for clarity and safety
+    let route_data = JupiterRouteInstructionData::parse_from_slice(&data[data.len() - 16..])
+        .map_err(|_| "Failed to parse route instruction amounts")?;
+    let in_amount = route_data.in_amount;
+    let quoted_out_amount = route_data.quoted_out_amount;
 
     // For Jupiter swaps, we need to infer token accounts from the instruction accounts
     let in_token = if accounts.len() > 0 {

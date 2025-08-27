@@ -1,40 +1,19 @@
 //! Stakepool program preset for Solana
 
+mod config;
+
 use crate::core::{
-    InstructionVisualizer, SolanaIntegrationConfig, SolanaIntegrationConfigData, VisualizerContext,
+    InstructionVisualizer, SolanaIntegrationConfig, VisualizerContext,
     VisualizerKind,
 };
+use config::StakepoolConfig;
 use spl_stake_pool::instruction::StakePoolInstruction;
-use std::collections::HashMap;
 use visualsign::errors::VisualSignError;
 use visualsign::field_builders::create_text_field;
 use visualsign::{AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldCommon};
 
 // Create a static instance that we can reference
 static STAKEPOOL_CONFIG: StakepoolConfig = StakepoolConfig;
-
-pub struct StakepoolConfig;
-
-impl SolanaIntegrationConfig for StakepoolConfig {
-    fn new() -> Self {
-        Self
-    }
-
-    fn data(&self) -> &SolanaIntegrationConfigData {
-        static DATA: std::sync::OnceLock<SolanaIntegrationConfigData> = std::sync::OnceLock::new();
-        DATA.get_or_init(|| {
-            let mut programs = HashMap::new();
-            let mut stakepool_instructions = HashMap::new();
-            stakepool_instructions.insert("*", vec!["*"]);
-            // this is a weaker version, we can probably do a prefix match on SPoo1
-            programs.insert(
-                "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy",
-                stakepool_instructions,
-            );
-            SolanaIntegrationConfigData { programs }
-        })
-    }
-}
 
 pub struct StakepoolVisualizer;
 

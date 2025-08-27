@@ -6,6 +6,9 @@ use solana_sdk::transaction::Transaction as SolanaTransaction;
 use visualsign::AnnotatedPayloadField;
 use visualsign::errors::{TransactionParseError, VisualSignError};
 
+// The following include! macro pulls in visualizer implementations generated at build time.
+// The file "generated_visualizers.rs" is created by the build script and contains code for
+// available_visualizers and related items, which are used to decode and visualize instructions.
 include!(concat!(env!("OUT_DIR"), "/generated_visualizers.rs"));
 
 /// Visualizes all the instructions and related fields in a transaction/message

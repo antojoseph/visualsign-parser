@@ -110,7 +110,7 @@ pub fn get_token_info(address: &str, amount: u64) -> SwapTokenInfo {
         }
     } else {
         // Unknown token - show truncated address
-        let truncated = if address.len() > 8 {
+        let truncated = if address.len() > ADDRESS_TRUNCATION_LENGTH {
             format!("{}...{}", &address[0..4], &address[address.len() - 4..])
         } else {
             address.to_string()
