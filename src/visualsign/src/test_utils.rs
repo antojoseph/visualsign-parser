@@ -1,22 +1,17 @@
 use crate::{SignablePayload, SignablePayloadField};
 
 pub fn assert_has_field(payload: &SignablePayload, label: &str) {
-    let (found, _) = payload
-        .fields
-        .iter()
-        .map(|field| check_signable_payload_field(field, label))
-        .find(|x| x.0)
-        .unwrap_or((false, "".to_string()));
+    let (found, _) = check_signable_payload(payload, label);
     assert!(found, "Should have a {label} field");
 }
 
+pub fn assert_has_field_with_context(payload: &SignablePayload, label: &str, context: &str) {
+    let (found, _) = check_signable_payload(payload, label);
+    assert!(found, "Should have a {label} field in {context}");
+}
+
 pub fn assert_has_field_with_value(payload: &SignablePayload, label: &str, expected_value: &str) {
-    let (found, value) = payload
-        .fields
-        .iter()
-        .map(|field| check_signable_payload_field(field, label))
-        .find(|x| x.0)
-        .unwrap_or((false, "".to_string()));
+    let (found, value) = check_signable_payload(payload, label);
     assert!(
         found,
         "Should have a {label} field with value {expected_value}"
@@ -27,7 +22,33 @@ pub fn assert_has_field_with_value(payload: &SignablePayload, label: &str, expec
     );
 }
 
-fn check_signable_payload_field(field: &SignablePayloadField, label: &str) -> (bool, String) {
+pub fn assert_has_field_with_value_with_context(
+    payload: &SignablePayload,
+    label: &str,
+    expected_value: &str,
+    context: &str,
+) {
+    let (found, value) = check_signable_payload(payload, label);
+    assert!(
+        found,
+        "Should have a {label} field with value {expected_value} in {context}"
+    );
+    assert_eq!(
+        value, expected_value,
+        "Should have a {label} field with value {expected_value}. Actual value: {value} in {context}"
+    );
+}
+
+pub fn check_signable_payload(payload: &SignablePayload, label: &str) -> (bool, String) {
+    payload
+        .fields
+        .iter()
+        .map(|field| check_signable_payload_field(field, label))
+        .find(|x| x.0)
+        .unwrap_or((false, "".to_string()))
+}
+
+pub fn check_signable_payload_field(field: &SignablePayloadField, label: &str) -> (bool, String) {
     match field {
         SignablePayloadField::Text { common, text } => {
             (common.label == label, text.text.to_string())
