@@ -29,14 +29,7 @@ impl CommandVisualizer for MomentumVisualizer {
             ));
         };
 
-        let function = match pwc.function.as_str().try_into() {
-            Ok(function) => function,
-            Err(e) => return Err(VisualSignError::DecodeError(e)),
-        };
-
-        println!("1");
-
-        match function {
+        match pwc.function.as_str().try_into()? {
             LiquidityFunctions::RemoveLiquidity => Ok(self.handle_remove_liquidity(context, pwc)?),
             LiquidityFunctions::ClosePosition => Ok(self.handle_close_position(context)?),
         }

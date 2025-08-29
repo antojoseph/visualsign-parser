@@ -12,4 +12,4 @@ pub use package::SuiPackage;
 pub use tx_args::{get_index, get_nested_result_value, get_tx_type_arg, parse_numeric_argument};
 
 #[cfg(test)]
-pub use helpers::payload_from_b64;
+pub use helpers::{payload_from_b64, payload_from_b64_with_context};

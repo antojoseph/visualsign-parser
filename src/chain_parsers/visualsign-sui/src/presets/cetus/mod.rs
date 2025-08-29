@@ -1,12 +1,21 @@
 mod config;
 
-use config::{CETUS_CONFIG, Config, PoolScriptV2Functions, SwapA2BIndexes, SwapB2AIndexes};
+use config::{
+    AddLiquidityByFixCoinIndexes, CETUS_CONFIG, CetusModules, ClosePositionIndexes, Config,
+    OpenPositionWithLiquidityByFixCoinIndexes, OpenPositionWithLiquidityWithAllIndexes,
+    PoolScriptClosePositionIndexes, PoolScriptFunctions, PoolScriptRemoveLiquidityIndexes,
+    PoolScriptSwapA2BIndexes, PoolScriptSwapA2BWithPartnerIndexes, PoolScriptSwapB2AIndexes,
+    PoolScriptSwapB2AWithPartnerIndexes, PoolScriptV2Functions, RemoveLiquidityIndexes,
+    RouterCheckCoinThresholdIndexes, RouterFunctions, RouterSwapIndexes, SwapA2BIndexes,
+    SwapB2AIndexes, UtilsFunctions,
+};
 
 use crate::core::{CommandVisualizer, SuiIntegrationConfig, VisualizerContext, VisualizerKind};
 use crate::utils::{SuiCoin, get_tx_type_arg, truncate_address};
 
 use sui_json_rpc_types::{SuiCommand, SuiProgrammableMoveCall};
 
+use crate::presets::cetus::config::{SwapA2BWithPartnerIndexes, SwapB2AWithPartnerIndexes};
 use visualsign::{
     AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldCommon,
     SignablePayloadFieldListLayout, SignablePayloadFieldPreviewLayout, SignablePayloadFieldTextV2,
@@ -28,14 +37,69 @@ impl CommandVisualizer for CetusVisualizer {
             ));
         };
 
-        let function = match pwc.function.as_str().try_into() {
-            Ok(function) => function,
-            Err(e) => return Err(VisualSignError::DecodeError(e)),
-        };
-
-        match function {
-            PoolScriptV2Functions::SwapB2A => self.handle_swap(false, context, pwc),
-            PoolScriptV2Functions::SwapA2B => self.handle_swap(true, context, pwc),
+        match pwc.module.as_str().try_into()? {
+            CetusModules::PoolScriptV2 => match pwc.function.as_str().try_into()? {
+                PoolScriptV2Functions::SwapB2A => self.handle_swap_v2(false, context, pwc),
+                PoolScriptV2Functions::SwapA2B => self.handle_swap_v2(true, context, pwc),
+                PoolScriptV2Functions::SwapA2BWithPartner => {
+                    self.handle_swap_v2_with_partner(true, context, pwc)
+                }
+                PoolScriptV2Functions::SwapB2AWithPartner => {
+                    self.handle_swap_v2_with_partner(false, context, pwc)
+                }
+                PoolScriptV2Functions::CollectReward => self.handle_collect_reward(context, pwc),
+                PoolScriptV2Functions::CollectFee => self.handle_collect_fee(context, pwc),
+                PoolScriptV2Functions::ClosePosition => self.handle_close_position_v2(context, pwc),
+                PoolScriptV2Functions::OpenPositionWithLiquidityByFixCoin => {
+                    self.handle_open_position_with_liquidity_by_fix_coin_v2(context, pwc)
+                }
+                PoolScriptV2Functions::OpenPositionWithLiquidityWithAll => {
+                    self.handle_open_position_with_liquidity_with_all_v2(context, pwc)
+                }
+                PoolScriptV2Functions::AddLiquidityByFixCoin => {
+                    self.handle_add_liquidity_by_fix_coin_v2(context, pwc)
+                }
+                PoolScriptV2Functions::RemoveLiquidity => {
+                    self.handle_remove_liquidity_v2(context, pwc)
+                }
+            },
+            CetusModules::Router => match pwc.function.as_str().try_into()? {
+                RouterFunctions::Swap => self.handle_router_swap(context, pwc),
+                RouterFunctions::CheckCoinThreshold => {
+                    self.handle_check_coin_threshold(context, pwc)
+                }
+            },
+            CetusModules::PoolScript => match pwc.function.as_str().try_into()? {
+                PoolScriptFunctions::SwapA2B => self.handle_swap_pool_script(true, context, pwc),
+                PoolScriptFunctions::SwapB2A => self.handle_swap_pool_script(false, context, pwc),
+                PoolScriptFunctions::SwapA2BWithPartner => {
+                    self.handle_swap_pool_script_with_partner(true, context, pwc)
+                }
+                PoolScriptFunctions::SwapB2AWithPartner => {
+                    self.handle_swap_pool_script_with_partner(false, context, pwc)
+                }
+                PoolScriptFunctions::CollectReward => self.handle_collect_reward(context, pwc),
+                PoolScriptFunctions::CollectFee => self.handle_collect_fee(context, pwc),
+                PoolScriptFunctions::ClosePosition => {
+                    self.handle_close_position_pool_script(context, pwc)
+                }
+                PoolScriptFunctions::RemoveLiquidity => {
+                    self.handle_remove_liquidity_pool_script(context, pwc)
+                }
+                PoolScriptFunctions::AddLiquidityFixCoinOnlyA
+                | PoolScriptFunctions::AddLiquidityFixCoinOnlyB
+                | PoolScriptFunctions::AddLiquidityFixCoinWithAll
+                | PoolScriptFunctions::OpenPositionWithLiquidityOnlyA
+                | PoolScriptFunctions::OpenPositionWithLiquidityOnlyB
+                | PoolScriptFunctions::OpenPositionWithLiquidityWithAll => {
+                    self.handle_pool_script_liquidity_ops(context, pwc)
+                }
+            },
+            CetusModules::Utils => match pwc.function.as_str().try_into()? {
+                UtilsFunctions::TransferCoinToSender => {
+                    self.handle_transfer_coin_to_sender(context, pwc)
+                }
+            },
         }
     }
 
@@ -49,24 +113,12 @@ impl CommandVisualizer for CetusVisualizer {
 }
 
 impl CetusVisualizer {
-    fn handle_swap(
+    fn handle_swap_v2(
         &self,
         is_a2b: bool,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
-        let (input_coin, output_coin): (SuiCoin, SuiCoin) = if is_a2b {
-            (
-                get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default(),
-                get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default(),
-            )
-        } else {
-            (
-                get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default(),
-                get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default(),
-            )
-        };
-
         let (by_amount_in, amount, amount_limit) = if is_a2b {
             (
                 SwapA2BIndexes::get_by_amount_in(context.inputs(), &pwc.arguments)?,
@@ -78,6 +130,130 @@ impl CetusVisualizer {
                 SwapB2AIndexes::get_by_amount_in(context.inputs(), &pwc.arguments)?,
                 SwapB2AIndexes::get_amount(context.inputs(), &pwc.arguments)?,
                 SwapB2AIndexes::get_amount_limit(context.inputs(), &pwc.arguments)?,
+            )
+        };
+
+        self.render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
+    }
+
+    fn handle_swap_v2_with_partner(
+        &self,
+        is_a2b: bool,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let (by_amount_in, amount, amount_limit) = if is_a2b {
+            (
+                SwapA2BWithPartnerIndexes::get_by_amount_in(context.inputs(), &pwc.arguments)?,
+                SwapA2BWithPartnerIndexes::get_amount(context.inputs(), &pwc.arguments)?,
+                SwapA2BWithPartnerIndexes::get_amount_limit(context.inputs(), &pwc.arguments)?,
+            )
+        } else {
+            (
+                SwapB2AWithPartnerIndexes::get_by_amount_in(context.inputs(), &pwc.arguments)?,
+                SwapB2AWithPartnerIndexes::get_amount(context.inputs(), &pwc.arguments)?,
+                SwapB2AWithPartnerIndexes::get_amount_limit(context.inputs(), &pwc.arguments)?,
+            )
+        };
+
+        self.render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
+    }
+
+    fn handle_swap_pool_script(
+        &self,
+        is_a2b: bool,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let (by_amount_in, amount, amount_limit) = if is_a2b {
+            (
+                PoolScriptSwapA2BIndexes::get_by_amount_in(context.inputs(), &pwc.arguments)?,
+                PoolScriptSwapA2BIndexes::get_amount(context.inputs(), &pwc.arguments)?,
+                PoolScriptSwapA2BIndexes::get_amount_limit(context.inputs(), &pwc.arguments)?,
+            )
+        } else {
+            (
+                PoolScriptSwapB2AIndexes::get_by_amount_in(context.inputs(), &pwc.arguments)?,
+                PoolScriptSwapB2AIndexes::get_amount(context.inputs(), &pwc.arguments)?,
+                PoolScriptSwapB2AIndexes::get_amount_limit(context.inputs(), &pwc.arguments)?,
+            )
+        };
+
+        self.render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
+    }
+
+    fn handle_swap_pool_script_with_partner(
+        &self,
+        is_a2b: bool,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let (by_amount_in, amount, amount_limit) = if is_a2b {
+            (
+                PoolScriptSwapA2BWithPartnerIndexes::get_by_amount_in(
+                    context.inputs(),
+                    &pwc.arguments,
+                )?,
+                PoolScriptSwapA2BWithPartnerIndexes::get_amount(context.inputs(), &pwc.arguments)?,
+                PoolScriptSwapA2BWithPartnerIndexes::get_amount_limit(
+                    context.inputs(),
+                    &pwc.arguments,
+                )?,
+            )
+        } else {
+            (
+                PoolScriptSwapB2AWithPartnerIndexes::get_by_amount_in(
+                    context.inputs(),
+                    &pwc.arguments,
+                )?,
+                PoolScriptSwapB2AWithPartnerIndexes::get_amount(context.inputs(), &pwc.arguments)?,
+                PoolScriptSwapB2AWithPartnerIndexes::get_amount_limit(
+                    context.inputs(),
+                    &pwc.arguments,
+                )?,
+            )
+        };
+
+        self.render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
+    }
+
+    fn handle_router_swap(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let is_a2b = RouterSwapIndexes::get_is_a2b(context.inputs(), &pwc.arguments)?;
+        let by_amount_in = RouterSwapIndexes::get_by_amount_in(context.inputs(), &pwc.arguments)?;
+        let amount = RouterSwapIndexes::get_amount(context.inputs(), &pwc.arguments)?;
+
+        let amount_limit = if by_amount_in {
+            // Min out is not explicitly provided here; use sqrt price limit presence to indicate
+            0u64
+        } else {
+            0u64
+        };
+
+        self.render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
+    }
+
+    fn render_swap_fields(
+        &self,
+        context: &VisualizerContext,
+        by_amount_in: bool,
+        amount: u64,
+        amount_limit: u64,
+        is_a2b: bool,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let (input_coin, output_coin): (SuiCoin, SuiCoin) = if is_a2b {
+            (
+                get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default(),
+                get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default(),
+            )
+        } else {
+            (
+                get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default(),
+                get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default(),
             )
         };
 
@@ -112,66 +288,698 @@ impl CetusVisualizer {
             create_text_field("Output Coin", &output_coin.to_string())?,
         ];
 
-        {
-            let title_text = if by_amount_in {
-                format!(
-                    "CetusAMM Swap: {} {} → {}",
-                    amount,
+        let title_text = format!(
+            "CetusAMM Swap: {} {} → {}",
+            amount,
+            input_coin.symbol(),
+            output_coin.symbol()
+        );
+        let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!(
+                    "Swap {} to {} ({}: {})",
                     input_coin.symbol(),
-                    output_coin.symbol()
-                )
-            } else {
-                format!(
-                    "CetusAMM Swap: {} {} ← {}",
-                    amount,
                     output_coin.symbol(),
-                    input_coin.symbol()
-                )
-            };
-            let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+                    limit_label,
+                    amount_limit
+                ),
+            )?],
+        };
 
-            let condensed = SignablePayloadFieldListLayout {
-                fields: vec![create_text_field(
-                    "Summary",
-                    &format!(
-                        "Swap {} to {} ({}: {})",
-                        input_coin.symbol(),
-                        output_coin.symbol(),
-                        limit_label,
-                        amount_limit
-                    ),
-                )?],
-            };
+        let expanded = SignablePayloadFieldListLayout {
+            fields: list_layout_fields,
+        };
 
-            let expanded = SignablePayloadFieldListLayout {
-                fields: list_layout_fields,
-            };
-
-            Ok(vec![AnnotatedPayloadField {
-                static_annotation: None,
-                dynamic_annotation: None,
-                signable_payload_field: SignablePayloadField::PreviewLayout {
-                    common: SignablePayloadFieldCommon {
-                        fallback_text: title_text.clone(),
-                        label: "CetusAMM Swap Command".to_string(),
-                    },
-                    preview_layout: SignablePayloadFieldPreviewLayout {
-                        title: Some(SignablePayloadFieldTextV2 { text: title_text }),
-                        subtitle: Some(SignablePayloadFieldTextV2 {
-                            text: subtitle_text,
-                        }),
-                        condensed: Some(condensed),
-                        expanded: Some(expanded),
-                    },
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "CetusAMM Swap Command".to_string(),
                 },
-            }])
-        }
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(expanded),
+                },
+            },
+        }])
+    }
+
+    fn handle_check_coin_threshold(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let threshold =
+            RouterCheckCoinThresholdIndexes::get_threshold(context.inputs(), &pwc.arguments)?;
+
+        let list_layout_fields = vec![
+            create_address_field(
+                "User Address",
+                &context.sender().to_string(),
+                None,
+                None,
+                None,
+                None,
+            )?,
+            create_text_field("Coin", &coin.to_string())?,
+            create_amount_field("Threshold", &threshold.to_string(), coin.symbol())?,
+        ];
+
+        let title_text = format!(
+            "Cetus Router: Check Coin Threshold {} {}",
+            threshold,
+            coin.symbol()
+        );
+        let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!("Check {} balance threshold {}", coin.symbol(), threshold),
+            )?],
+        };
+
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "Cetus Router Check Coin Threshold".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: list_layout_fields,
+                    }),
+                },
+            },
+        }])
+    }
+
+    fn handle_collect_reward(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+        let reward_coin: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 2).unwrap_or_default();
+
+        let list_layout_fields = vec![
+            create_address_field(
+                "User Address",
+                &context.sender().to_string(),
+                None,
+                None,
+                None,
+                None,
+            )?,
+            create_text_field("Pool Coin A", &coin_a.to_string())?,
+            create_text_field("Pool Coin B", &coin_b.to_string())?,
+            create_text_field("Reward Coin", &reward_coin.to_string())?,
+        ];
+
+        let title_text = format!("CetusAMM Collect Reward ({})", reward_coin.symbol());
+        let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!(
+                    "Collect rewards ({}) from pool {}/{}",
+                    reward_coin.symbol(),
+                    coin_a.symbol(),
+                    coin_b.symbol()
+                ),
+            )?],
+        };
+
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "CetusAMM Collect Reward Command".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: list_layout_fields,
+                    }),
+                },
+            },
+        }])
+    }
+
+    fn handle_collect_fee(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+        let list_layout_fields = vec![
+            create_address_field(
+                "User Address",
+                &context.sender().to_string(),
+                None,
+                None,
+                None,
+                None,
+            )?,
+            create_text_field("Pool Coin A", &coin_a.to_string())?,
+            create_text_field("Pool Coin B", &coin_b.to_string())?,
+        ];
+
+        let title_text = "CetusAMM Collect Fee".to_string();
+        let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!(
+                    "Collect fee from pool {}/{}",
+                    coin_a.symbol(),
+                    coin_b.symbol()
+                ),
+            )?],
+        };
+
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "CetusAMM Collect Fee Command".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: list_layout_fields,
+                    }),
+                },
+            },
+        }])
+    }
+
+    fn handle_close_position_v2(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+        let min_a = ClosePositionIndexes::get_min_amount_a(context.inputs(), &pwc.arguments)?;
+        let min_b = ClosePositionIndexes::get_min_amount_b(context.inputs(), &pwc.arguments)?;
+
+        self.render_close_position(context, coin_a, coin_b, min_a, min_b)
+    }
+
+    fn handle_close_position_pool_script(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+        let min_a =
+            PoolScriptClosePositionIndexes::get_min_amount_a(context.inputs(), &pwc.arguments)?;
+        let min_b =
+            PoolScriptClosePositionIndexes::get_min_amount_b(context.inputs(), &pwc.arguments)?;
+
+        self.render_close_position(context, coin_a, coin_b, min_a, min_b)
+    }
+
+    fn render_close_position(
+        &self,
+        context: &VisualizerContext,
+        coin_a: SuiCoin,
+        coin_b: SuiCoin,
+        min_a: u64,
+        min_b: u64,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let list_layout_fields = vec![
+            create_address_field(
+                "User Address",
+                &context.sender().to_string(),
+                None,
+                None,
+                None,
+                None,
+            )?,
+            create_text_field("Pool Coin A", &coin_a.to_string())?,
+            create_text_field("Pool Coin B", &coin_b.to_string())?,
+            create_amount_field("Min Out A", &min_a.to_string(), coin_a.symbol())?,
+            create_amount_field("Min Out B", &min_b.to_string(), coin_b.symbol())?,
+        ];
+
+        let title_text = "CetusAMM Close Position".to_string();
+        let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!(
+                    "Close position and withdraw at least {} {} and {} {}",
+                    min_a,
+                    coin_a.symbol(),
+                    min_b,
+                    coin_b.symbol()
+                ),
+            )?],
+        };
+
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "CetusAMM Close Position Command".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: list_layout_fields,
+                    }),
+                },
+            },
+        }])
+    }
+
+    fn handle_remove_liquidity_v2(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+        let liquidity = RemoveLiquidityIndexes::get_liquidity(context.inputs(), &pwc.arguments)?;
+        let min_a = RemoveLiquidityIndexes::get_min_amount_a(context.inputs(), &pwc.arguments)?;
+        let min_b = RemoveLiquidityIndexes::get_min_amount_b(context.inputs(), &pwc.arguments)?;
+
+        self.render_remove_liquidity(context, coin_a, coin_b, liquidity, min_a, min_b)
+    }
+
+    fn handle_remove_liquidity_pool_script(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+        let liquidity =
+            PoolScriptRemoveLiquidityIndexes::get_liquidity(context.inputs(), &pwc.arguments)?;
+        let min_a =
+            PoolScriptRemoveLiquidityIndexes::get_min_amount_a(context.inputs(), &pwc.arguments)?;
+        let min_b =
+            PoolScriptRemoveLiquidityIndexes::get_min_amount_b(context.inputs(), &pwc.arguments)?;
+
+        self.render_remove_liquidity(context, coin_a, coin_b, liquidity, min_a, min_b)
+    }
+
+    fn render_remove_liquidity(
+        &self,
+        context: &VisualizerContext,
+        coin_a: SuiCoin,
+        coin_b: SuiCoin,
+        liquidity: u128,
+        min_a: u64,
+        min_b: u64,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let list_layout_fields = vec![
+            create_address_field(
+                "User Address",
+                &context.sender().to_string(),
+                None,
+                None,
+                None,
+                None,
+            )?,
+            create_text_field("Pool Coin A", &coin_a.to_string())?,
+            create_text_field("Pool Coin B", &coin_b.to_string())?,
+            create_amount_field("Liquidity", &liquidity.to_string(), "RAW")?,
+            create_amount_field("Min Out A", &min_a.to_string(), coin_a.symbol())?,
+            create_amount_field("Min Out B", &min_b.to_string(), coin_b.symbol())?,
+        ];
+
+        let title_text = "CetusAMM Remove Liquidity".to_string();
+        let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!(
+                    "Remove liquidity {} from {}/{} (min {} {}, {} {})",
+                    liquidity,
+                    coin_a.symbol(),
+                    coin_b.symbol(),
+                    min_a,
+                    coin_a.symbol(),
+                    min_b,
+                    coin_b.symbol()
+                ),
+            )?],
+        };
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "CetusAMM Remove Liquidity Command".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: list_layout_fields,
+                    }),
+                },
+            },
+        }])
+    }
+
+    fn handle_add_liquidity_by_fix_coin_v2(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+        let amount_a =
+            AddLiquidityByFixCoinIndexes::get_amount_a(context.inputs(), &pwc.arguments)?;
+        let amount_b =
+            AddLiquidityByFixCoinIndexes::get_amount_b(context.inputs(), &pwc.arguments)?;
+        let is_fix_a =
+            AddLiquidityByFixCoinIndexes::get_is_fix_a(context.inputs(), &pwc.arguments)?;
+
+        let fix_coin = if is_fix_a { &coin_a } else { &coin_b };
+
+        let list_layout_fields = vec![
+            create_address_field(
+                "User Address",
+                &context.sender().to_string(),
+                None,
+                None,
+                None,
+                None,
+            )?,
+            create_text_field("Pool Coin A", &coin_a.to_string())?,
+            create_text_field("Pool Coin B", &coin_b.to_string())?,
+            create_text_field("Fix Coin", &fix_coin.to_string())?,
+            create_amount_field("Amount A", &amount_a.to_string(), coin_a.symbol())?,
+            create_amount_field("Amount B", &amount_b.to_string(), coin_b.symbol())?,
+        ];
+
+        let title_text = "CetusAMM Add Liquidity (Fix Coin)".to_string();
+        let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!(
+                    "Add liquidity with {} fixed (A: {}, B: {})",
+                    fix_coin.symbol(),
+                    amount_a,
+                    amount_b
+                ),
+            )?],
+        };
+
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "CetusAMM Add Liquidity (Fix Coin) Command".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: list_layout_fields,
+                    }),
+                },
+            },
+        }])
+    }
+
+    fn handle_open_position_with_liquidity_by_fix_coin_v2(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+        let amount_a = OpenPositionWithLiquidityByFixCoinIndexes::get_amount_a(
+            context.inputs(),
+            &pwc.arguments,
+        )?;
+        let amount_b = OpenPositionWithLiquidityByFixCoinIndexes::get_amount_b(
+            context.inputs(),
+            &pwc.arguments,
+        )?;
+        let is_fix_a = OpenPositionWithLiquidityByFixCoinIndexes::get_is_fix_a(
+            context.inputs(),
+            &pwc.arguments,
+        )?;
+
+        self.render_open_position_with_liquidity(
+            context, coin_a, coin_b, amount_a, amount_b, is_fix_a,
+        )
+    }
+
+    fn handle_open_position_with_liquidity_with_all_v2(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+        let amount_a = OpenPositionWithLiquidityWithAllIndexes::get_amount_a(
+            context.inputs(),
+            &pwc.arguments,
+        )?;
+        let amount_b = OpenPositionWithLiquidityWithAllIndexes::get_amount_b(
+            context.inputs(),
+            &pwc.arguments,
+        )?;
+        let is_fix_a = OpenPositionWithLiquidityWithAllIndexes::get_is_fix_a(
+            context.inputs(),
+            &pwc.arguments,
+        )?;
+
+        self.render_open_position_with_liquidity(
+            context, coin_a, coin_b, amount_a, amount_b, is_fix_a,
+        )
+    }
+
+    fn render_open_position_with_liquidity(
+        &self,
+        context: &VisualizerContext,
+        coin_a: SuiCoin,
+        coin_b: SuiCoin,
+        amount_a: u64,
+        amount_b: u64,
+        is_fix_a: bool,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let fix_coin = if is_fix_a { &coin_a } else { &coin_b };
+        let list_layout_fields = vec![
+            create_address_field(
+                "User Address",
+                &context.sender().to_string(),
+                None,
+                None,
+                None,
+                None,
+            )?,
+            create_text_field("Pool Coin A", &coin_a.to_string())?,
+            create_text_field("Pool Coin B", &coin_b.to_string())?,
+            create_text_field("Fix Coin", &fix_coin.to_string())?,
+            create_amount_field("Amount A", &amount_a.to_string(), coin_a.symbol())?,
+            create_amount_field("Amount B", &amount_b.to_string(), coin_b.symbol())?,
+        ];
+
+        let title_text = "CetusAMM Open Position With Liquidity".to_string();
+        let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!(
+                    "Open position with {} fixed (A: {}, B: {})",
+                    fix_coin.symbol(),
+                    amount_a,
+                    amount_b
+                ),
+            )?],
+        };
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "CetusAMM Open Position With Liquidity Command".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: list_layout_fields,
+                    }),
+                },
+            },
+        }])
+    }
+
+    fn handle_pool_script_liquidity_ops(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        // For pool_script liquidity-related helpers, just show coin types; amounts are already
+        // captured in other flows or depend on nested receipts. Keep a simple summary.
+        let coin_a: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+        let coin_b: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 1).unwrap_or_default();
+
+        let title_text = "CetusAMM Liquidity Operation".to_string();
+        let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!(
+                    "Operate liquidity on pool {}/{}",
+                    coin_a.symbol(),
+                    coin_b.symbol()
+                ),
+            )?],
+        };
+        let expanded = SignablePayloadFieldListLayout {
+            fields: vec![
+                create_address_field(
+                    "User Address",
+                    &context.sender().to_string(),
+                    None,
+                    None,
+                    None,
+                    None,
+                )?,
+                create_text_field("Pool Coin A", &coin_a.to_string())?,
+                create_text_field("Pool Coin B", &coin_b.to_string())?,
+            ],
+        };
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "CetusAMM Liquidity Command".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(expanded),
+                },
+            },
+        }])
+    }
+
+    fn handle_transfer_coin_to_sender(
+        &self,
+        context: &VisualizerContext,
+        pwc: &SuiProgrammableMoveCall,
+    ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
+        let coin: SuiCoin = get_tx_type_arg(&pwc.type_arguments, 0).unwrap_or_default();
+
+        let list_layout_fields = vec![
+            create_address_field(
+                "User Address",
+                &context.sender().to_string(),
+                None,
+                None,
+                None,
+                None,
+            )?,
+            create_text_field("Coin", &coin.to_string())?,
+        ];
+
+        let title_text = format!("Cetus Utils: Transfer {} to Sender", coin.symbol());
+        let subtitle_text = format!("To {}", truncate_address(&context.sender().to_string()));
+        let condensed = SignablePayloadFieldListLayout {
+            fields: vec![create_text_field(
+                "Summary",
+                &format!("Transfer {} to sender", coin.symbol()),
+            )?],
+        };
+
+        Ok(vec![AnnotatedPayloadField {
+            static_annotation: None,
+            dynamic_annotation: None,
+            signable_payload_field: SignablePayloadField::PreviewLayout {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: title_text.clone(),
+                    label: "Cetus Utils Transfer Coin To Sender".to_string(),
+                },
+                preview_layout: SignablePayloadFieldPreviewLayout {
+                    title: Some(SignablePayloadFieldTextV2 { text: title_text }),
+                    subtitle: Some(SignablePayloadFieldTextV2 {
+                        text: subtitle_text,
+                    }),
+                    condensed: Some(condensed),
+                    expanded: Some(SignablePayloadFieldListLayout {
+                        fields: list_layout_fields,
+                    }),
+                },
+            },
+        }])
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::payload_from_b64;
+    use crate::utils::{payload_from_b64, payload_from_b64_with_context};
 
     use visualsign::test_utils::{
         assert_has_field, assert_has_field_with_context, assert_has_field_with_value,
@@ -261,11 +1069,12 @@ mod tests {
         for (name, category) in data.categories.iter() {
             let label = &category.label;
             for (op_id, op) in category.operations.iter() {
-                let payload = payload_from_b64(&op.data);
                 let test_context = format!(
                     "Test name: {name}. Tx id: {}{op_id}",
                     data.explorer_tx_prefix
                 );
+
+                let payload = payload_from_b64_with_context(&op.data, &test_context);
 
                 assert_has_field_with_context(&payload, label, &test_context);
                 for (field, expected) in op.asserts.iter() {

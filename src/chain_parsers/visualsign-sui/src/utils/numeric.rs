@@ -22,9 +22,7 @@ where
                         "Failed to convert call argument to JSON value".into(),
                     ),
                 )?;
-                T::from_le_bytes(&bytes).ok_or(VisualSignError::DecodeError(
-                    "Failed to decode number".into(),
-                ))
+                T::from_le_bytes(&bytes).map_err(|e| VisualSignError::DecodeError(e.to_string()))
             }
             Some(_) => T::from_move_value(value),
         },
@@ -40,17 +38,17 @@ fn json_array_to_bytes(value: &serde_json::Value) -> Option<Vec<u8>> {
 }
 
 pub trait FromLeBytes: Sized {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self>;
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self, String>;
 
     fn from_move_value(value: &SuiPureValue) -> Result<Self, VisualSignError>;
 }
 
 impl FromLeBytes for bool {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self, String> {
         match bytes[0] {
-            0 => Some(false),
-            1 => Some(true),
-            _ => None,
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(format!("Invalid bool value: {}", bytes[0])),
         }
     }
 
@@ -81,8 +79,8 @@ impl FromLeBytes for bool {
 }
 
 impl FromLeBytes for u8 {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        Some(bytes[0])
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self, String> {
+        Ok(bytes[0])
     }
 
     fn from_move_value(value: &SuiPureValue) -> Result<Self, VisualSignError> {
@@ -112,8 +110,12 @@ impl FromLeBytes for u8 {
 }
 
 impl FromLeBytes for u16 {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        Some(u16::from_le_bytes(bytes.try_into().ok()?))
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self, String> {
+        Ok(u16::from_le_bytes(
+            bytes
+                .try_into()
+                .map_err(|e| format!("Invalid u16 value: {}", e))?,
+        ))
     }
 
     fn from_move_value(value: &SuiPureValue) -> Result<Self, VisualSignError> {
@@ -143,8 +145,12 @@ impl FromLeBytes for u16 {
 }
 
 impl FromLeBytes for u32 {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        Some(u32::from_le_bytes(bytes.try_into().ok()?))
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self, String> {
+        Ok(u32::from_le_bytes(
+            bytes
+                .try_into()
+                .map_err(|e| format!("Invalid u32 value: {}", e))?,
+        ))
     }
 
     fn from_move_value(value: &SuiPureValue) -> Result<Self, VisualSignError> {
@@ -174,8 +180,12 @@ impl FromLeBytes for u32 {
 }
 
 impl FromLeBytes for u64 {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        Some(u64::from_le_bytes(bytes.try_into().ok()?))
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self, String> {
+        Ok(u64::from_le_bytes(
+            bytes
+                .try_into()
+                .map_err(|e| format!("Invalid u64 value: {}", e))?,
+        ))
     }
 
     fn from_move_value(value: &SuiPureValue) -> Result<Self, VisualSignError> {
@@ -205,8 +215,12 @@ impl FromLeBytes for u64 {
 }
 
 impl FromLeBytes for u128 {
-    fn from_le_bytes(bytes: &[u8]) -> Option<Self> {
-        Some(u128::from_le_bytes(bytes.try_into().ok()?))
+    fn from_le_bytes(bytes: &[u8]) -> Result<Self, String> {
+        Ok(u128::from_le_bytes(
+            bytes
+                .try_into()
+                .map_err(|e| format!("Invalid u128 value: {}", e))?,
+        ))
     }
 
     fn from_move_value(value: &SuiPureValue) -> Result<Self, VisualSignError> {

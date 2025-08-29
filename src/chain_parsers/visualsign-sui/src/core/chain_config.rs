@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! __gen_module {
   (
-    $module_name:ident => $FuncEnum:ident : {
+    $module_name:ident as $ModVariant:ident => $FuncEnum:ident : {
       $(
         $fn_snake:ident as $FnVariant:ident => $IdxEnum:ident (
           $(
@@ -21,12 +21,12 @@ macro_rules! __gen_module {
     }
 
     impl TryFrom<&str> for $FuncEnum {
-      type Error = String;
+      type Error = visualsign::errors::VisualSignError;
 
       fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
           $( stringify!($fn_snake) => Ok($FuncEnum::$FnVariant), )*
-          _ => Err(format!("Unsupported function name: {}", value)),
+          _ => Err(visualsign::errors::VisualSignError::DecodeError(format!("Unsupported function name: {}", value))),
         }
       }
     }
@@ -101,9 +101,9 @@ macro_rules! chain_config {
     $(
       $pkg_key:ident => {
         package_id => $pkg_id:expr,
-        modules: {
+        modules as $ModEnum:ident : {
           $(
-            $mod_name:ident => $FuncEnum:ident : {
+            $mod_name:ident as $ModVariant:ident => $FuncEnum:ident : {
               $(
                 $fn_snake:ident as $FnVariant:ident => $IdxEnum:ident (
                   $(
@@ -121,11 +121,29 @@ macro_rules! chain_config {
       }
     ),* $(,)?
   ) => {
+    $(
+      #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+      pub enum $ModEnum {
+        $( $ModVariant ),*
+      }
+
+        impl TryFrom<&str> for $ModEnum {
+          type Error = visualsign::errors::VisualSignError;
+
+          fn try_from(value: &str) -> Result<Self, Self::Error> {
+            match value {
+              $( stringify!($mod_name) => Ok($ModEnum::$ModVariant), )*
+              _ => Err(visualsign::errors::VisualSignError::DecodeError(format!("Unsupported module name: {}", value))),
+            }
+          }
+        }
+    )*
+
     // 1) Generate module-level code (enums + indexes + getters)
     $(
       $(
         $crate::__gen_module!(
-          $mod_name => $FuncEnum : {
+          $mod_name as $ModVariant => $FuncEnum : {
             $(
               $fn_snake as $FnVariant => $IdxEnum (
                 $(
