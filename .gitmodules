@@ -1,0 +1,3 @@
+[submodule "src/chain_parsers/visualsign-ethereum/static/eip7730"]
+	path = src/chain_parsers/visualsign-ethereum/static/eip7730
+	url = https://github.com/LedgerHQ/clear-signing-erc7730-registry
