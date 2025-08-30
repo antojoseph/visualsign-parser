@@ -1,0 +1,63 @@
+SignablePayload {
+    fields: [
+        TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "Ethereum Mainnet",
+                label: "Network",
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: "Ethereum Mainnet",
+            },
+        },
+        TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
+                label: "To",
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
+            },
+        },
+        TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "0 ETH",
+                label: "Value",
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: "0 ETH",
+            },
+        },
+        TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "318162",
+                label: "Gas Limit",
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: "318162",
+            },
+        },
+        TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "5",
+                label: "Nonce",
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: "5",
+            },
+        },
+        TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "0xe8eda9df0000000000000000000000002260fac5e5542a773aa44fbcfedf7c193bc2c59900000000000000000000000000000000000000000000000000000000000003e8000000000000000000000000f68a392712174eecc6e4d00d7cf444dd5203aa5c0000000000000000000000000000000000000000000000000000000000000000",
+                label: "Input Data",
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: "0xe8eda9df0000000000000000000000002260fac5e5542a773aa44fbcfedf7c193bc2c59900000000000000000000000000000000000000000000000000000000000003e8000000000000000000000000f68a392712174eecc6e4d00d7cf444dd5203aa5c0000000000000000000000000000000000000000000000000000000000000000",
+            },
+        },
+    ],
+    payload_type: "EthereumTx",
+    subtitle: None,
+    title: "Ethereum Transaction",
+    version: "0",
+}
+

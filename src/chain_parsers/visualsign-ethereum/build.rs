@@ -1,3 +1,4 @@
+use alloy_primitives::keccak256;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::{env, fs, io::Write, path::PathBuf};
@@ -22,8 +23,8 @@ fn main() {
         let mut parsed_any = false;
         if let Ok(spec) = visualsign_erc7730_adapter::types::ERC7730::from_json(contents) {
             if let Some(display) = spec.display {
-                for (selector, format) in display.formats.into_iter() {
-                    if selector.len() == 10 && selector.starts_with("0x") {
+                for (key, format) in display.formats.into_iter() {
+                    if let Some(selector) = normalize_selector(&key) {
                         let fields: Vec<_> = format
                             .fields
                             .into_iter()
@@ -53,6 +54,8 @@ fn main() {
             struct FbField {
                 label: Option<String>,
                 path: Option<String>,
+                #[serde(rename = "$ref")]
+                r#ref: Option<String>,
             }
             #[derive(Deserialize)]
             struct FbFormat {
@@ -61,8 +64,13 @@ fn main() {
                 fields: Option<Vec<FbField>>,
             }
             #[derive(Deserialize)]
+            struct FbDefinition {
+                label: Option<String>,
+            }
+            #[derive(Deserialize)]
             struct FbDisplay {
                 formats: HashMap<String, FbFormat>,
+                definitions: Option<HashMap<String, FbDefinition>>,
             }
             #[derive(Deserialize)]
             struct FbSpec {
@@ -70,15 +78,29 @@ fn main() {
             }
             if let Ok(fb) = serde_json::from_str::<FbSpec>(contents) {
                 if let Some(display) = fb.display {
-                    for (selector, fmt) in display.formats.into_iter() {
-                        if selector.len() == 10 && selector.starts_with("0x") {
+                    let defs = display.definitions.unwrap_or_default();
+                    for (key, fmt) in display.formats.into_iter() {
+                        if let Some(selector) = normalize_selector(&key) {
                             let fields: Vec<_> = fmt
                                 .fields
                                 .unwrap_or_default()
                                 .into_iter()
-                                .map(|f| SimpleField {
-                                    label: f.label.unwrap_or_default(),
-                                    path: f.path.unwrap_or_default(),
+                                .map(|f| {
+                                    // derive label: explicit label, else from $ref -> definitions
+                                    let label = if let Some(lbl) = f.label {
+                                        lbl
+                                    } else if let Some(r) = f.r#ref {
+                                        let key = r.rsplit('.').next().unwrap_or(&r);
+                                        defs.get(key)
+                                            .and_then(|d| d.label.clone())
+                                            .unwrap_or_default()
+                                    } else {
+                                        String::new()
+                                    };
+                                    SimpleField {
+                                        label,
+                                        path: f.path.unwrap_or_default(),
+                                    }
                                 })
                                 .collect();
                             entries.push(RegistryEntry {
@@ -204,4 +226,32 @@ fn visit_dir<F: FnMut(&std::path::Path, &str)>(dir: &std::path::Path, cb: &mut F
 
 fn escape(s: &str) -> String {
     s.replace('"', "\\\"")
+}
+
+// Normalize a format key into a 4-byte calldata selector (0xXXXXXXXX)
+// Accepted inputs:
+// - Already a selector: "0x0123abcd" (case-insensitive)
+// - Function signature: "transfer(address,uint256)" -> keccak256 and take first 4 bytes
+// Any other form (e.g., EIP-712 primary type like "mint") returns None.
+fn normalize_selector(key: &str) -> Option<String> {
+    let k = key.trim();
+    // Already a 4-byte selector
+    if k.len() == 10 && k.starts_with("0x") && k.chars().skip(2).all(|c| c.is_ascii_hexdigit()) {
+        return Some(k.to_ascii_lowercase());
+    }
+    // Function signature form: name(args)
+    if let (Some(l), Some(r)) = (k.find('('), k.rfind(')')) {
+        if r > l {
+            let sig = &k[..=r]; // include ')'
+            // Remove any internal whitespace to be safe
+            let cleaned: String = sig.chars().filter(|c| !c.is_whitespace()).collect();
+            let digest = keccak256(cleaned.as_bytes());
+            let selector = &digest.as_slice()[..4];
+            return Some(format!(
+                "0x{:02x}{:02x}{:02x}{:02x}",
+                selector[0], selector[1], selector[2], selector[3]
+            ));
+        }
+    }
+    None
 }

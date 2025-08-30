@@ -109,16 +109,6 @@ pub fn decode_calldata(calldata: &[u8]) -> Option<Vec<SignablePayloadField>> {
             text_v2: SignablePayloadFieldTextV2 { text: text_content },
         });
     }
-    if fields.is_empty() {
-        // Provide at least a raw calldata field if nothing matched
-        fields.push(SignablePayloadField::TextV2 {
-            common: SignablePayloadFieldCommon {
-                fallback_text: selector_hex.clone(),
-                label: "Function Selector".into(),
-            },
-            text_v2: SignablePayloadFieldTextV2 { text: selector_hex },
-        });
-    }
     Some(fields)
 }
 

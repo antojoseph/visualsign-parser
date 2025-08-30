@@ -12,14 +12,10 @@ fn fixture_path(name: &str) -> PathBuf {
     path
 }
 
-static FIXTURES: [&str; 2] = ["1559", "legacy"];
+fn test_fixture_dir(path: &str, fixtures: &[&str]) {
+    let fixtures_dir = fixture_path(path);
 
-#[test]
-fn test_with_fixtures() {
-    // Get paths for all test cases
-    let fixtures_dir = fixture_path("");
-
-    for test_name in FIXTURES {
+    for test_name in fixtures {
         let input_path = fixtures_dir.join(format!("{}.input", test_name));
 
         // Read input file contents
@@ -61,4 +57,13 @@ fn test_with_fixtures() {
             test_name
         );
     }
+}
+
+#[test]
+fn test_with_fixtures() {
+    test_fixture_dir("", &["1559", "legacy"]);
+    test_fixture_dir(
+        "eip7730",
+        &["aave_deposit", "ledgerquest_mint", "paraswap_simpleBuy"],
+    );
 }
