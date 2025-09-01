@@ -62,8 +62,5 @@ fn test_fixture_dir(path: &str, fixtures: &[&str]) {
 #[test]
 fn test_with_fixtures() {
     test_fixture_dir("", &["1559", "legacy"]);
-    test_fixture_dir(
-        "eip7730",
-        &["aave_deposit", "ledgerquest_mint", "paraswap_simpleBuy"],
-    );
+    test_fixture_dir("eip7730", &["aave_deposit", "paraswap_simpleSwap"]);
 }

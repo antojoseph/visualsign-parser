@@ -10873,6 +10873,7 @@ dependencies = [
  "phf_codegen",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.12",
  "visualsign 0.1.0",
  "visualsign-erc7730-adapter",

@@ -24,3 +24,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 visualsign-erc7730-adapter = { git = "ssh://git@github.com/anchorageoss/visualsign-erc-7730-adapter.git", branch = "main" }
 alloy-primitives = "1.0.20"
+
+[dev-dependencies]
+tempfile = "3"

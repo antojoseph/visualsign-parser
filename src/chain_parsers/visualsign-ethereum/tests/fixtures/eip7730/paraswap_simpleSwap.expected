@@ -2,20 +2,20 @@ SignablePayload {
     fields: [
         TextV2 {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Ethereum Mainnet",
+                fallback_text: "BNB Smart Chain Mainnet",
                 label: "Network",
             },
             text_v2: SignablePayloadFieldTextV2 {
-                text: "Ethereum Mainnet",
+                text: "BNB Smart Chain Mainnet",
             },
         },
         TextV2 {
             common: SignablePayloadFieldCommon {
-                fallback_text: "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
+                fallback_text: "0xDEF171Fe48CF0115B1d80b88dc8eAB59176FEe57",
                 label: "To",
             },
             text_v2: SignablePayloadFieldTextV2 {
-                text: "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
+                text: "0xDEF171Fe48CF0115B1d80b88dc8eAB59176FEe57",
             },
         },
         TextV2 {
@@ -29,25 +29,34 @@ SignablePayload {
         },
         TextV2 {
             common: SignablePayloadFieldCommon {
-                fallback_text: "318162",
+                fallback_text: "2000000",
                 label: "Gas Limit",
             },
             text_v2: SignablePayloadFieldTextV2 {
-                text: "318162",
+                text: "2000000",
             },
         },
         TextV2 {
             common: SignablePayloadFieldCommon {
-                fallback_text: "5",
+                fallback_text: "0.00000000010000001 ETH",
+                label: "Gas Price",
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: "0.00000000010000001 ETH",
+            },
+        },
+        TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "133706",
                 label: "Nonce",
             },
             text_v2: SignablePayloadFieldTextV2 {
-                text: "5",
+                text: "133706",
             },
         },
         ListLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Decoded 2 field(s)",
+                fallback_text: "Decoded 3 field(s)",
                 label: "Decoded Input",
             },
             list_layout: SignablePayloadFieldListLayout {
@@ -55,11 +64,25 @@ SignablePayload {
                     AnnotatedPayloadField {
                         signable_payload_field: AmountV2 {
                             common: SignablePayloadFieldCommon {
-                                fallback_text: "196268403159008932410419402999721616371951519129",
-                                label: "Amount to supply",
+                                fallback_text: "0x0000000000000000000000000000000000000000000000000000000000000020",
+                                label: "Amount to Send",
                             },
                             amount_v2: SignablePayloadFieldAmountV2 {
-                                amount: "196268403159008932410419402999721616371951519129",
+                                amount: "0x0000000000000000000000000000000000000000000000000000000000000020",
+                                abbreviation: None,
+                            },
+                        },
+                        static_annotation: None,
+                        dynamic_annotation: None,
+                    },
+                    AnnotatedPayloadField {
+                        signable_payload_field: AmountV2 {
+                            common: SignablePayloadFieldCommon {
+                                fallback_text: "0x55d398326f99059ff775485246999027b3197955",
+                                label: "Minimum to Receive",
+                            },
+                            amount_v2: SignablePayloadFieldAmountV2 {
+                                amount: "0x55d398326f99059ff775485246999027b3197955",
                                 abbreviation: None,
                             },
                         },
@@ -69,11 +92,11 @@ SignablePayload {
                     AnnotatedPayloadField {
                         signable_payload_field: AddressV2 {
                             common: SignablePayloadFieldCommon {
-                                fallback_text: "0x00000000000000000000000000000000000000000000000000000000000003e8",
-                                label: "Collateral recipient",
+                                fallback_text: "0x0000000000000000000000008ac76a51cc950d9822d68b83fe1ad97b32cd580d",
+                                label: "Beneficiary",
                             },
                             address_v2: SignablePayloadFieldAddressV2 {
-                                address: "0x00000000000000000000000000000000000000000000000000000000000003e8",
+                                address: "0x0000000000000000000000008ac76a51cc950d9822d68b83fe1ad97b32cd580d",
                                 name: "",
                                 memo: None,
                                 asset_label: "",

@@ -1,27 +1,36 @@
 use crate::registry::{CommandVisualizer, VisualizerContext, decode_calldata};
-use visualsign::{SignablePayloadField, SignablePayloadFieldCommon, SignablePayloadFieldTextV2};
+use visualsign::{
+    AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldCommon,
+    SignablePayloadFieldListLayout,
+};
 
-pub struct Eip7730Visualizer;
+pub struct Eip7730TxVisualizer;
 
-impl CommandVisualizer for Eip7730Visualizer {
+impl CommandVisualizer for Eip7730TxVisualizer {
     fn visualize_tx_commands(&self, context: &VisualizerContext) -> Option<SignablePayloadField> {
         let decoded = decode_calldata(context.calldata)?;
         if decoded.is_empty() {
             return None;
         }
-        if decoded.len() == 1 {
-            // A single decoded field is already suitably granular.
-            return Some(decoded.into_iter().next().unwrap());
-        }
-        // Summarize multiple decoded fields by listing their labels.
-        let labels: Vec<String> = decoded.iter().map(|f| f.label().to_string()).collect();
-        let summary_text = format!("Decoded Input Fields: {}", labels.join(", "));
-        Some(SignablePayloadField::TextV2 {
+
+        // Create one item per decoded field, using the actual field types and values
+        let items: Vec<AnnotatedPayloadField> = decoded
+            .into_iter()
+            .map(|field| AnnotatedPayloadField {
+                signable_payload_field: field,
+                static_annotation: None,
+                dynamic_annotation: None,
+            })
+            .collect();
+
+        let summary_text = format!("Decoded {} field(s)", items.len());
+
+        Some(SignablePayloadField::ListLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: summary_text.clone(),
+                fallback_text: summary_text,
                 label: "Decoded Input".to_string(),
             },
-            text_v2: SignablePayloadFieldTextV2 { text: summary_text },
+            list_layout: SignablePayloadFieldListLayout { fields: items },
         })
     }
 }
