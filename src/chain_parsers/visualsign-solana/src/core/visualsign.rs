@@ -268,9 +268,10 @@ fn convert_v0_to_visual_sign_payload(
     match decode_v0_instructions(v0_message) {
         Ok(instruction_fields) => {
             for (index, instruction_field) in instruction_fields.iter().enumerate() {
-                println!(
+                tracing::debug!(
                     "Handling instruction {} with visualizer {:?}",
-                    index, "V0 Instruction"
+                    index,
+                    "V0 Instruction"
                 );
                 fields.push(instruction_field.signable_payload_field.clone());
             }
@@ -337,16 +338,14 @@ fn decode_v0_transfers(
         ))
     })?;
 
+    let is_full_transaction = true; // true because we're passing full tx and not message
     // Parse using solana-parser which handles V0 transactions and lookup tables
-    let parsed_transaction = parse_transaction(
-        hex::encode(transaction_bytes),
-        true, /* true because we're passing the full transaction */
-    )
-    .map_err(|e| {
-        VisualSignError::ParseError(visualsign::vsptrait::TransactionParseError::DecodeError(
-            format!("Failed to parse V0 transaction: {}", e),
-        ))
-    })?;
+    let parsed_transaction = parse_transaction(hex::encode(transaction_bytes), is_full_transaction)
+        .map_err(|e| {
+            VisualSignError::ParseError(visualsign::vsptrait::TransactionParseError::DecodeError(
+                format!("Failed to parse V0 transaction: {}", e),
+            ))
+        })?;
 
     let mut fields = Vec::new();
 
@@ -481,6 +480,14 @@ fn decode_v0_instructions(
         .collect();
 
     // Process each instruction with the visualizer framework
+    if account_keys.is_empty() {
+        return Err(VisualSignError::ParseError(
+            visualsign::vsptrait::TransactionParseError::DecodeError(
+                "V0 transaction has no account keys".to_string(),
+            ),
+        ));
+    }
+
     instructions
         .iter()
         .enumerate()
