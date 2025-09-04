@@ -66,116 +66,78 @@ pub fn assert_has_fields_with_values_with_context(
 }
 
 pub fn check_signable_payload(payload: &SignablePayload, label: &str) -> (bool, Vec<String>) {
-    let mut all_values: Vec<String> = Vec::new();
+    let values: Vec<String> = payload
+        .fields
+        .iter()
+        .flat_map(|field| check_signable_payload_field(field, label).1)
+        .collect();
 
-    for field in payload.fields.iter() {
-        let (_, mut values) = check_signable_payload_field(field, label);
-        all_values.append(&mut values);
-    }
-
-    (!all_values.is_empty(), all_values)
+    (!values.is_empty(), values)
 }
 
 pub fn check_signable_payload_field(
     field: &SignablePayloadField,
     label: &str,
 ) -> (bool, Vec<String>) {
-    match field {
-        SignablePayloadField::Text { common, text } => {
-            if common.label == label {
-                (true, vec![text.text.to_string()])
-            } else {
-                (false, Vec::new())
-            }
-        }
-        SignablePayloadField::TextV2 { common, text_v2 } => {
-            if common.label == label {
-                (true, vec![text_v2.text.to_string()])
-            } else {
-                (false, Vec::new())
-            }
-        }
-        SignablePayloadField::Address { common, address } => {
-            if common.label == label {
-                (true, vec![address.address.to_string()])
-            } else {
-                (false, Vec::new())
-            }
-        }
-        SignablePayloadField::AddressV2 { common, address_v2 } => {
-            if common.label == label {
-                (true, vec![address_v2.address.to_string()])
-            } else {
-                (false, Vec::new())
-            }
-        }
-        SignablePayloadField::Number { common, number } => {
-            if common.label == label {
-                (true, vec![number.number.to_string()])
-            } else {
-                (false, Vec::new())
-            }
-        }
-        SignablePayloadField::Amount { common, amount } => {
-            if common.label == label {
-                (true, vec![amount.amount.to_string()])
-            } else {
-                (false, Vec::new())
-            }
-        }
-        SignablePayloadField::AmountV2 { common, amount_v2 } => {
-            if common.label == label {
-                (true, vec![amount_v2.amount.to_string()])
-            } else {
-                (false, Vec::new())
-            }
-        }
+    let values: Vec<String> = match field {
+        SignablePayloadField::Text { common, text } => (common.label == label)
+            .then(|| text.text.to_string())
+            .into_iter()
+            .collect(),
+        SignablePayloadField::TextV2 { common, text_v2 } => (common.label == label)
+            .then(|| text_v2.text.to_string())
+            .into_iter()
+            .collect(),
+        SignablePayloadField::Address { common, address } => (common.label == label)
+            .then(|| address.address.to_string())
+            .into_iter()
+            .collect(),
+        SignablePayloadField::AddressV2 { common, address_v2 } => (common.label == label)
+            .then(|| address_v2.address.to_string())
+            .into_iter()
+            .collect(),
+        SignablePayloadField::Number { common, number } => (common.label == label)
+            .then(|| number.number.to_string())
+            .into_iter()
+            .collect(),
+        SignablePayloadField::Amount { common, amount } => (common.label == label)
+            .then(|| amount.amount.to_string())
+            .into_iter()
+            .collect(),
+        SignablePayloadField::AmountV2 { common, amount_v2 } => (common.label == label)
+            .then(|| amount_v2.amount.to_string())
+            .into_iter()
+            .collect(),
         SignablePayloadField::PreviewLayout {
             preview_layout,
             common,
         } => {
-            let mut values: Vec<String> = Vec::new();
+            let fallback = (common.label == label).then(|| common.fallback_text.to_string());
 
-            if common.label == label {
-                values.push(common.fallback_text.to_string());
-            }
+            let nested = preview_layout
+                .condensed
+                .iter()
+                .flat_map(|c| c.fields.iter())
+                .chain(preview_layout.expanded.iter().flat_map(|e| e.fields.iter()))
+                .flat_map(|f| check_signable_payload_field(&f.signable_payload_field, label).1);
 
-            if let Some(condensed) = preview_layout.condensed.as_ref() {
-                for field in condensed.fields.iter() {
-                    let (_, mut inner_values) =
-                        check_signable_payload_field(&field.signable_payload_field, label);
-                    values.append(&mut inner_values);
-                }
-            }
-
-            if let Some(expanded) = preview_layout.expanded.as_ref() {
-                for field in expanded.fields.iter() {
-                    let (_, mut inner_values) =
-                        check_signable_payload_field(&field.signable_payload_field, label);
-                    values.append(&mut inner_values);
-                }
-            }
-
-            (!values.is_empty(), values)
+            fallback.into_iter().chain(nested).collect()
         }
         SignablePayloadField::ListLayout {
             list_layout,
             common,
         } => {
-            let mut values: Vec<String> = Vec::new();
+            let fallback = (common.label == label).then(|| common.fallback_text.to_string());
 
-            if common.label == label {
-                values.push(common.fallback_text.to_string());
-            }
+            let nested = list_layout
+                .fields
+                .iter()
+                .flat_map(|f| check_signable_payload_field(&f.signable_payload_field, label).1);
 
-            for field in list_layout.fields.iter() {
-                let (_, mut inner_values) =
-                    check_signable_payload_field(&field.signable_payload_field, label);
-                values.append(&mut inner_values);
-            }
-
-            (!values.is_empty(), values)
+            fallback.into_iter().chain(nested).collect()
         }
-        _ => (false, Vec::new()),
-    }
+        _ => Vec::new(),
+    };
+
+    (!values.is_empty(), values)
 }
