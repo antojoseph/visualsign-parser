@@ -37,36 +37,36 @@ impl CommandVisualizer for SuilendVisualizer {
             ));
         };
 
-        let function = pwc.function.as_str().try_into()?;
-
-        match function {
-            LendingMarketFunctions::BorrowRequest => self.handle_borrow_request(context, pwc),
-            LendingMarketFunctions::ClaimRewards => self.handle_claim_rewards(context, pwc),
-            LendingMarketFunctions::Repay => self.handle_repay(context, pwc),
+        match pwc.function.as_str().try_into()? {
+            LendingMarketFunctions::BorrowRequest => Self::handle_borrow_request(context, pwc),
+            LendingMarketFunctions::ClaimRewards => Self::handle_claim_rewards(context, pwc),
+            LendingMarketFunctions::Repay => Self::handle_repay(context, pwc),
             LendingMarketFunctions::ClaimRewardsAndDeposit => {
-                self.handle_claim_rewards_and_deposit(context, pwc)
+                Self::handle_claim_rewards_and_deposit(context, pwc)
             }
-            LendingMarketFunctions::CreateObligation => self.handle_create_obligation(context, pwc),
+            LendingMarketFunctions::CreateObligation => {
+                Self::handle_create_obligation(context, pwc)
+            }
             LendingMarketFunctions::DepositCTokensIntoObligation => {
-                self.handle_deposit_ctokens_into_obligation(context, pwc)
+                Self::handle_deposit_ctokens_into_obligation(context, pwc)
             }
             LendingMarketFunctions::DepositLiquidityAndMintCTokens => {
-                self.handle_deposit_liquidity_and_mint_ctokens(context, pwc)
+                Self::handle_deposit_liquidity_and_mint_ctokens(context, pwc)
             }
             LendingMarketFunctions::FulfillLiquidityRequest => {
-                self.handle_fulfill_liquidity_request(context, pwc)
+                Self::handle_fulfill_liquidity_request(context, pwc)
             }
-            LendingMarketFunctions::RebalanceStaker => self.handle_rebalance_staker(context, pwc),
+            LendingMarketFunctions::RebalanceStaker => Self::handle_rebalance_staker(context, pwc),
             LendingMarketFunctions::RedeemCTokensAndWithdrawLiquidityRequest => {
-                self.handle_redeem_ctokens_and_withdraw_liquidity_request(context, pwc)
+                Self::handle_redeem_ctokens_and_withdraw_liquidity_request(context, pwc)
             }
             LendingMarketFunctions::RefreshReservePrice => {
-                self.handle_refresh_reserve_price(context, pwc)
+                Self::handle_refresh_reserve_price(context, pwc)
             }
             LendingMarketFunctions::UnstakeSuiFromStaker => {
-                self.handle_unstake_sui_from_staker(context, pwc)
+                Self::handle_unstake_sui_from_staker(context, pwc)
             }
-            LendingMarketFunctions::WithdrawCTokens => self.handle_withdraw_ctokens(context, pwc),
+            LendingMarketFunctions::WithdrawCTokens => Self::handle_withdraw_ctokens(context, pwc),
         }
     }
 
@@ -104,7 +104,6 @@ fn get_repay_amount(
 
 impl SuilendVisualizer {
     fn handle_borrow_request(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -172,7 +171,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_claim_rewards(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -195,8 +193,7 @@ impl SuilendVisualizer {
             fields: vec![create_text_field(
                 "Summary",
                 &format!(
-                    "Claim {} rewards from reserve #{} (reward #{}) via {}",
-                    reward_side, reserve_id, reward_index, package
+                    "Claim {reward_side} rewards from reserve #{reserve_id} (reward #{reward_index}) via {package}"
                 ),
             )?],
         };
@@ -244,7 +241,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_claim_rewards_and_deposit(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -269,8 +265,7 @@ impl SuilendVisualizer {
             fields: vec![create_text_field(
                 "Summary",
                 &format!(
-                    "Claim {} rewards from reserve #{} (reward #{}) and deposit to reserve #{} via {}",
-                    reward_side, reward_reserve_id, reward_index, deposit_reserve_id, package
+                    "Claim {reward_side} rewards from reserve #{reward_reserve_id} (reward #{reward_index}) and deposit to reserve #{deposit_reserve_id} via {package}"
                 ),
             )?],
         };
@@ -319,7 +314,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_create_obligation(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -330,7 +324,7 @@ impl SuilendVisualizer {
         let condensed = SignablePayloadFieldListLayout {
             fields: vec![create_text_field(
                 "Summary",
-                &format!("Create new obligation via {}", package),
+                &format!("Create new obligation via {package}"),
             )?],
         };
         let expanded = SignablePayloadFieldListLayout {
@@ -370,7 +364,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_deposit_ctokens_into_obligation(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -434,7 +427,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_deposit_liquidity_and_mint_ctokens(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -503,7 +495,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_fulfill_liquidity_request(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -518,10 +509,7 @@ impl SuilendVisualizer {
         let condensed = SignablePayloadFieldListLayout {
             fields: vec![create_text_field(
                 "Summary",
-                &format!(
-                    "Fulfill liquidity request for reserve #{} via {}",
-                    reserve_index, package
-                ),
+                &format!("Fulfill liquidity request for reserve #{reserve_index} via {package}"),
             )?],
         };
         let expanded = SignablePayloadFieldListLayout {
@@ -566,7 +554,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_rebalance_staker(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -578,10 +565,7 @@ impl SuilendVisualizer {
         let condensed = SignablePayloadFieldListLayout {
             fields: vec![create_text_field(
                 "Summary",
-                &format!(
-                    "Rebalance SUI staker for reserve #{} via {}",
-                    sui_reserve_index, package
-                ),
+                &format!("Rebalance SUI staker for reserve #{sui_reserve_index} via {package}"),
             )?],
         };
         let expanded = SignablePayloadFieldListLayout {
@@ -625,7 +609,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_redeem_ctokens_and_withdraw_liquidity_request(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -697,7 +680,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_refresh_reserve_price(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -709,10 +691,7 @@ impl SuilendVisualizer {
         let condensed = SignablePayloadFieldListLayout {
             fields: vec![create_text_field(
                 "Summary",
-                &format!(
-                    "Refresh price for reserve #{} via {}",
-                    reserve_index, package
-                ),
+                &format!("Refresh price for reserve #{reserve_index} via {package}"),
             )?],
         };
         let expanded = SignablePayloadFieldListLayout {
@@ -753,7 +732,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_repay(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -780,7 +758,7 @@ impl SuilendVisualizer {
         let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
 
         let mut summary = format!("Repay {} {} via {}", amount_str, coin.symbol(), package);
-        summary.push_str(&format!(" (reserve #{})", reserve_index));
+        summary.push_str(&format!(" (reserve #{reserve_index})"));
 
         let condensed = SignablePayloadFieldListLayout {
             fields: vec![create_text_field("Summary", &summary)?],
@@ -830,7 +808,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_unstake_sui_from_staker(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -845,10 +822,7 @@ impl SuilendVisualizer {
         let condensed = SignablePayloadFieldListLayout {
             fields: vec![create_text_field(
                 "Summary",
-                &format!(
-                    "Unstake SUI from staker (reserve #{}) via {}",
-                    sui_reserve_index, package
-                ),
+                &format!("Unstake SUI from staker (reserve #{sui_reserve_index}) via {package}"),
             )?],
         };
         let expanded = SignablePayloadFieldListLayout {
@@ -892,7 +866,6 @@ impl SuilendVisualizer {
     }
 
     fn handle_withdraw_ctokens(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -963,79 +936,10 @@ impl SuilendVisualizer {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::payload_from_b64_with_context;
-
-    use visualsign::test_utils::{
-        assert_has_field_with_context, assert_has_field_with_value_with_context,
-        assert_has_fields_with_values_with_context,
-    };
+    use crate::utils::run_aggregated_fixture;
 
     #[test]
     fn test_suilend_aggregated() {
-        use serde::Deserialize;
-        use std::collections::HashMap;
-
-        #[derive(Debug, Deserialize)]
-        #[serde(untagged)]
-        enum OneOrMany {
-            One(String),
-            Many(Vec<String>),
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct Operation {
-            data: String,
-            asserts: HashMap<String, OneOrMany>,
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct Category {
-            label: String,
-            operations: HashMap<String, Operation>,
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct AggregatedTestData {
-            explorer_tx_prefix: String,
-            #[serde(flatten)]
-            modules: HashMap<String, HashMap<String, Category>>,
-        }
-
-        let json_str = include_str!("aggregated_test_data.json");
-        let data: AggregatedTestData =
-            serde_json::from_str(json_str).expect("invalid aggregated_test_data.json");
-
-        // TODO: use module during visualization (in details)
-        for (_module_name, module) in data.modules.iter() {
-            for (name, category) in module.iter() {
-                let label = &category.label;
-                for (op_id, op) in category.operations.iter() {
-                    let test_context = format!(
-                        "Test name: {name}. Tx id: {}{op_id}",
-                        data.explorer_tx_prefix
-                    );
-
-                    let payload = payload_from_b64_with_context(&op.data, &test_context);
-
-                    assert_has_field_with_context(&payload, label, &test_context);
-                    for (field, expected) in op.asserts.iter() {
-                        match expected {
-                            OneOrMany::One(value) => assert_has_field_with_value_with_context(
-                                &payload,
-                                field,
-                                value.as_str(),
-                                &test_context,
-                            ),
-                            OneOrMany::Many(values) => assert_has_fields_with_values_with_context(
-                                &payload,
-                                field,
-                                values.as_slice(),
-                                &test_context,
-                            ),
-                        }
-                    }
-                }
-            }
-        }
+        run_aggregated_fixture(include_str!("aggregated_test_data.json"), "Suilend");
     }
 }

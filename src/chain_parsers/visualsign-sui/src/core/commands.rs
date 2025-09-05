@@ -18,10 +18,14 @@ pub fn decode_commands(
         _ => return Ok(vec![]),
     };
 
-    // TODO: Add a comment that `available_visualizers` is generated
+    // Note: `available_visualizers()` is generated at build time by build.rs.
+    // It scans `src/presets` and `src/integrations` for visualizers and wires
+    // them here. To adjust which visualizers are included, modify build.rs.
     let visualizers: Vec<Box<dyn CommandVisualizer>> = available_visualizers();
-    let visualizers_refs: Vec<&dyn CommandVisualizer> =
-        visualizers.iter().map(|v| v.as_ref()).collect::<Vec<_>>();
+    let visualizers_refs: Vec<&dyn CommandVisualizer> = visualizers
+        .iter()
+        .map(std::convert::AsRef::as_ref)
+        .collect::<Vec<_>>();
 
     tx_commands
         .iter()

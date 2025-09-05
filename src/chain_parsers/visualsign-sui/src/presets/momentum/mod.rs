@@ -35,23 +35,23 @@ impl CommandVisualizer for MomentumVisualizer {
         match pwc.module.as_str().try_into()? {
             MomentumModules::Liquidity => match pwc.function.as_str().try_into()? {
                 LiquidityFunctions::RemoveLiquidity => {
-                    Ok(self.handle_remove_liquidity(context, pwc)?)
+                    Ok(Self::handle_remove_liquidity(context, pwc)?)
                 }
-                LiquidityFunctions::ClosePosition => Ok(self.handle_close_position(context)?),
-                LiquidityFunctions::AddLiquidity => Ok(self.handle_add_liquidity(context, pwc)?),
-                LiquidityFunctions::OpenPosition => Ok(self.handle_open_position(context, pwc)?),
+                LiquidityFunctions::ClosePosition => Ok(Self::handle_close_position(context)?),
+                LiquidityFunctions::AddLiquidity => Ok(Self::handle_add_liquidity(context, pwc)?),
+                LiquidityFunctions::OpenPosition => Ok(Self::handle_open_position(context, pwc)?),
             },
             MomentumModules::Collect => match pwc.function.as_str().try_into()? {
-                CollectFunctions::Fee => Ok(self.handle_collect_fee(context, pwc)?),
-                CollectFunctions::Reward => Ok(self.handle_collect_reward(context, pwc)?),
+                CollectFunctions::Fee => Ok(Self::handle_collect_fee(context, pwc)?),
+                CollectFunctions::Reward => Ok(Self::handle_collect_reward(context, pwc)?),
             },
             MomentumModules::Trade => match pwc.function.as_str().try_into()? {
-                TradeFunctions::FlashSwap => Ok(self.handle_trade_flash_swap(context, pwc)?),
+                TradeFunctions::FlashSwap => Ok(Self::handle_trade_flash_swap(context, pwc)?),
                 TradeFunctions::RepayFlashSwap => {
-                    Ok(self.handle_trade_repay_flash_swap(context, pwc)?)
+                    Ok(Self::handle_trade_repay_flash_swap(context, pwc)?)
                 }
                 TradeFunctions::SwapReceiptDebts => {
-                    Ok(self.handle_trade_swap_receipt_debts(context)?)
+                    Ok(Self::handle_trade_swap_receipt_debts(context)?)
                 }
                 TradeFunctions::FlashLoan => {
                     todo!("Have not found tx for testing yet")
@@ -74,7 +74,6 @@ impl CommandVisualizer for MomentumVisualizer {
 
 impl MomentumVisualizer {
     fn handle_remove_liquidity(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -157,7 +156,6 @@ impl MomentumVisualizer {
     }
 
     fn handle_close_position(
-        &self,
         context: &VisualizerContext,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
         let list_layout_fields = vec![create_address_field(
@@ -206,7 +204,6 @@ impl MomentumVisualizer {
     }
 
     fn handle_add_liquidity(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -283,7 +280,6 @@ impl MomentumVisualizer {
     }
 
     fn handle_open_position(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -341,7 +337,6 @@ impl MomentumVisualizer {
     }
 
     fn handle_collect_fee(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -397,7 +392,6 @@ impl MomentumVisualizer {
     }
 
     fn handle_collect_reward(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -456,7 +450,6 @@ impl MomentumVisualizer {
     }
 
     fn handle_trade_flash_swap(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -508,7 +501,6 @@ impl MomentumVisualizer {
     }
 
     fn handle_trade_repay_flash_swap(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -564,7 +556,6 @@ impl MomentumVisualizer {
     }
 
     fn handle_trade_swap_receipt_debts(
-        &self,
         context: &VisualizerContext,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
         let list_layout_fields = vec![create_address_field(
@@ -607,12 +598,9 @@ impl MomentumVisualizer {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{payload_from_b64, payload_from_b64_with_context};
+    use crate::utils::{payload_from_b64, run_aggregated_fixture};
 
-    use visualsign::test_utils::{
-        assert_has_field, assert_has_field_with_context, assert_has_field_with_value_with_context,
-        assert_has_fields_with_values_with_context,
-    };
+    use visualsign::test_utils::assert_has_field;
 
     #[test]
     fn test_momentum_remove_liquidity() {
@@ -634,70 +622,6 @@ mod tests {
 
     #[test]
     fn test_momentum_aggregated() {
-        use serde::Deserialize;
-        use std::collections::HashMap;
-
-        #[derive(Debug, Deserialize)]
-        #[serde(untagged)]
-        enum OneOrMany {
-            One(String),
-            Many(Vec<String>),
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct Operation {
-            data: String,
-            asserts: HashMap<String, OneOrMany>,
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct Category {
-            label: String,
-            operations: HashMap<String, Operation>,
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct AggregatedTestData {
-            explorer_tx_prefix: String,
-            #[serde(flatten)]
-            modules: HashMap<String, HashMap<String, Category>>,
-        }
-
-        let json_str = include_str!("aggregated_test_data.json");
-        let data: AggregatedTestData =
-            serde_json::from_str(json_str).expect("invalid aggregated_test_data.json");
-
-        // TODO: use module during visualization (in details)
-        for (_module_name, module) in data.modules.iter() {
-            for (name, category) in module.iter() {
-                let label = &category.label;
-                for (op_id, op) in category.operations.iter() {
-                    let test_context = format!(
-                        "Test name: {name}. Tx id: {}{op_id}",
-                        data.explorer_tx_prefix
-                    );
-
-                    let payload = payload_from_b64_with_context(&op.data, &test_context);
-
-                    assert_has_field_with_context(&payload, label, &test_context);
-                    for (field, expected) in op.asserts.iter() {
-                        match expected {
-                            OneOrMany::One(value) => assert_has_field_with_value_with_context(
-                                &payload,
-                                field,
-                                value.as_str(),
-                                &test_context,
-                            ),
-                            OneOrMany::Many(values) => assert_has_fields_with_values_with_context(
-                                &payload,
-                                field,
-                                values.as_slice(),
-                                &test_context,
-                            ),
-                        }
-                    }
-                }
-            }
-        }
+        run_aggregated_fixture(include_str!("aggregated_test_data.json"), "Momentum");
     }
 }

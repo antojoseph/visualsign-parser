@@ -40,56 +40,56 @@ impl CommandVisualizer for CetusVisualizer {
 
         match pwc.module.as_str().try_into()? {
             CetusModules::PoolScript => match pwc.function.as_str().try_into()? {
-                PoolScriptFunctions::SwapA2B => self.handle_swap_pool_script(true, context, pwc),
-                PoolScriptFunctions::SwapB2A => self.handle_swap_pool_script(false, context, pwc),
+                PoolScriptFunctions::SwapA2B => Self::handle_swap_pool_script(true, context, pwc),
+                PoolScriptFunctions::SwapB2A => Self::handle_swap_pool_script(false, context, pwc),
                 PoolScriptFunctions::SwapA2BWithPartner => {
-                    self.handle_swap_pool_script_with_partner(true, context, pwc)
+                    Self::handle_swap_pool_script_with_partner(true, context, pwc)
                 }
                 PoolScriptFunctions::SwapB2AWithPartner => {
-                    self.handle_swap_pool_script_with_partner(false, context, pwc)
+                    Self::handle_swap_pool_script_with_partner(false, context, pwc)
                 }
                 PoolScriptFunctions::ClosePosition => {
-                    self.handle_close_position_pool_script(context, pwc)
+                    Self::handle_close_position_pool_script(context, pwc)
                 }
                 PoolScriptFunctions::RemoveLiquidity => {
-                    self.handle_remove_liquidity_pool_script(context, pwc)
+                    Self::handle_remove_liquidity_pool_script(context, pwc)
                 }
                 PoolScriptFunctions::OpenPositionWithLiquidityWithAll => {
-                    self.handle_pool_script_liquidity_ops(context, pwc)
+                    Self::handle_pool_script_liquidity_ops(context, pwc)
                 }
             },
             CetusModules::PoolScriptV2 => match pwc.function.as_str().try_into()? {
-                PoolScriptV2Functions::SwapB2A => self.handle_swap_v2(false, context, pwc),
-                PoolScriptV2Functions::SwapA2B => self.handle_swap_v2(true, context, pwc),
+                PoolScriptV2Functions::SwapB2A => Self::handle_swap_v2(false, context, pwc),
+                PoolScriptV2Functions::SwapA2B => Self::handle_swap_v2(true, context, pwc),
                 PoolScriptV2Functions::SwapA2BWithPartner => {
-                    self.handle_swap_v2_with_partner(true, context, pwc)
+                    Self::handle_swap_v2_with_partner(true, context, pwc)
                 }
                 PoolScriptV2Functions::SwapB2AWithPartner => {
-                    self.handle_swap_v2_with_partner(false, context, pwc)
+                    Self::handle_swap_v2_with_partner(false, context, pwc)
                 }
-                PoolScriptV2Functions::CollectReward => self.handle_collect_reward(context, pwc),
-                PoolScriptV2Functions::CollectFee => self.handle_collect_fee(context, pwc),
+                PoolScriptV2Functions::CollectReward => Self::handle_collect_reward(context, pwc),
+                PoolScriptV2Functions::CollectFee => Self::handle_collect_fee(context, pwc),
                 PoolScriptV2Functions::OpenPositionWithLiquidityByFixCoin => {
-                    self.handle_open_position_with_liquidity_by_fix_coin_v2(context, pwc)
+                    Self::handle_open_position_with_liquidity_by_fix_coin_v2(context, pwc)
                 }
                 PoolScriptV2Functions::AddLiquidityByFixCoin => {
-                    self.handle_add_liquidity_by_fix_coin_v2(context, pwc)
+                    Self::handle_add_liquidity_by_fix_coin_v2(context, pwc)
                 }
             },
             CetusModules::Router => match pwc.function.as_str().try_into()? {
-                RouterFunctions::Swap => self.handle_router_swap(context, pwc),
+                RouterFunctions::Swap => Self::handle_router_swap(context, pwc),
                 RouterFunctions::CheckCoinThreshold => {
-                    self.handle_check_coin_threshold(context, pwc)
+                    Self::handle_check_coin_threshold(context, pwc)
                 }
             },
             CetusModules::Utils => match pwc.function.as_str().try_into()? {
                 UtilsFunctions::TransferCoinToSender => {
-                    self.handle_transfer_coin_to_sender(context, pwc)
+                    Self::handle_transfer_coin_to_sender(context, pwc)
                 }
             },
             CetusModules::PoolScriptV3 => match pwc.function.as_str().try_into()? {
-                PoolScriptV3Functions::CollectFee => self.handle_collect_fee(context, pwc),
-                PoolScriptV3Functions::CollectReward => self.handle_collect_reward(context, pwc),
+                PoolScriptV3Functions::CollectFee => Self::handle_collect_fee(context, pwc),
+                PoolScriptV3Functions::CollectReward => Self::handle_collect_reward(context, pwc),
             },
         }
     }
@@ -105,7 +105,6 @@ impl CommandVisualizer for CetusVisualizer {
 
 impl CetusVisualizer {
     fn handle_swap_v2(
-        &self,
         is_a2b: bool,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
@@ -124,11 +123,10 @@ impl CetusVisualizer {
             )
         };
 
-        self.render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
+        Self::render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
     }
 
     fn handle_swap_v2_with_partner(
-        &self,
         is_a2b: bool,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
@@ -147,11 +145,10 @@ impl CetusVisualizer {
             )
         };
 
-        self.render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
+        Self::render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
     }
 
     fn handle_swap_pool_script(
-        &self,
         is_a2b: bool,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
@@ -170,11 +167,10 @@ impl CetusVisualizer {
             )
         };
 
-        self.render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
+        Self::render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
     }
 
     fn handle_swap_pool_script_with_partner(
-        &self,
         is_a2b: bool,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
@@ -205,11 +201,10 @@ impl CetusVisualizer {
             )
         };
 
-        self.render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
+        Self::render_swap_fields(context, by_amount_in, amount, amount_limit, is_a2b, pwc)
     }
 
     fn handle_router_swap(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -225,9 +220,9 @@ impl CetusVisualizer {
         let use_all_coin = RouterSwapIndexes::get_use_all_coin(context.inputs(), &pwc.arguments)?;
 
         let (input_coin, output_coin): (SuiCoin, SuiCoin) =
-            self.determine_input_output_coins(is_a2b, pwc);
+            Self::determine_input_output_coins(is_a2b, pwc);
         let (primary_label, primary_symbol, limit_label, limit_symbol) =
-            self.determine_primary_limit_labels(&input_coin, &output_coin, by_amount_in);
+            Self::determine_primary_limit_labels(&input_coin, &output_coin, by_amount_in);
 
         let mut list_layout_fields = vec![
             create_address_field(
@@ -308,7 +303,6 @@ impl CetusVisualizer {
     }
 
     fn determine_input_output_coins(
-        &self,
         is_a2b: bool,
         pwc: &SuiProgrammableMoveCall,
     ) -> (SuiCoin, SuiCoin) {
@@ -326,7 +320,6 @@ impl CetusVisualizer {
     }
 
     fn determine_primary_limit_labels<'a>(
-        &self,
         input_coin: &'a SuiCoin,
         output_coin: &'a SuiCoin,
         by_amount_in: bool,
@@ -349,7 +342,6 @@ impl CetusVisualizer {
     }
 
     fn render_swap_fields(
-        &self,
         context: &VisualizerContext,
         by_amount_in: bool,
         amount: u64,
@@ -358,10 +350,10 @@ impl CetusVisualizer {
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
         let (input_coin, output_coin): (SuiCoin, SuiCoin) =
-            self.determine_input_output_coins(is_a2b, pwc);
+            Self::determine_input_output_coins(is_a2b, pwc);
 
         let (primary_label, primary_symbol, limit_label, limit_symbol) =
-            self.determine_primary_limit_labels(&input_coin, &output_coin, by_amount_in);
+            Self::determine_primary_limit_labels(&input_coin, &output_coin, by_amount_in);
 
         let list_layout_fields = vec![
             create_address_field(
@@ -429,7 +421,6 @@ impl CetusVisualizer {
     }
 
     fn handle_check_coin_threshold(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -491,7 +482,6 @@ impl CetusVisualizer {
     }
 
     fn handle_collect_reward(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -554,7 +544,6 @@ impl CetusVisualizer {
     }
 
     fn handle_collect_fee(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -610,7 +599,6 @@ impl CetusVisualizer {
     }
 
     fn handle_close_position_pool_script(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -621,14 +609,13 @@ impl CetusVisualizer {
         let min_b =
             PoolScriptClosePositionIndexes::get_min_amount_b(context.inputs(), &pwc.arguments)?;
 
-        self.render_close_position(context, coin_a, coin_b, min_a, min_b)
+        Self::render_close_position(context, &coin_a, &coin_b, min_a, min_b)
     }
 
     fn render_close_position(
-        &self,
         context: &VisualizerContext,
-        coin_a: SuiCoin,
-        coin_b: SuiCoin,
+        coin_a: &SuiCoin,
+        coin_b: &SuiCoin,
         min_a: u64,
         min_b: u64,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -686,7 +673,6 @@ impl CetusVisualizer {
     }
 
     fn handle_remove_liquidity_pool_script(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -699,14 +685,13 @@ impl CetusVisualizer {
         let min_b =
             PoolScriptRemoveLiquidityIndexes::get_min_amount_b(context.inputs(), &pwc.arguments)?;
 
-        self.render_remove_liquidity(context, coin_a, coin_b, liquidity, min_a, min_b)
+        Self::render_remove_liquidity(context, &coin_a, &coin_b, liquidity, min_a, min_b)
     }
 
     fn render_remove_liquidity(
-        &self,
         context: &VisualizerContext,
-        coin_a: SuiCoin,
-        coin_b: SuiCoin,
+        coin_a: &SuiCoin,
+        coin_b: &SuiCoin,
         liquidity: u128,
         min_a: u64,
         min_b: u64,
@@ -767,7 +752,6 @@ impl CetusVisualizer {
     }
 
     fn handle_add_liquidity_by_fix_coin_v2(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -837,7 +821,6 @@ impl CetusVisualizer {
     }
 
     fn handle_open_position_with_liquidity_by_fix_coin_v2(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -856,16 +839,15 @@ impl CetusVisualizer {
             &pwc.arguments,
         )?;
 
-        self.render_open_position_with_liquidity(
-            context, coin_a, coin_b, amount_a, amount_b, is_fix_a,
+        Self::render_open_position_with_liquidity(
+            context, &coin_a, &coin_b, amount_a, amount_b, is_fix_a,
         )
     }
 
     fn render_open_position_with_liquidity(
-        &self,
         context: &VisualizerContext,
-        coin_a: SuiCoin,
-        coin_b: SuiCoin,
+        coin_a: &SuiCoin,
+        coin_b: &SuiCoin,
         amount_a: u64,
         amount_b: u64,
         is_fix_a: bool,
@@ -925,7 +907,6 @@ impl CetusVisualizer {
     }
 
     fn handle_pool_script_liquidity_ops(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -981,7 +962,6 @@ impl CetusVisualizer {
     }
 
     fn handle_transfer_coin_to_sender(
-        &self,
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,
     ) -> Result<Vec<AnnotatedPayloadField>, VisualSignError> {
@@ -1036,12 +1016,9 @@ impl CetusVisualizer {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{payload_from_b64, payload_from_b64_with_context};
+    use crate::utils::{payload_from_b64, run_aggregated_fixture};
 
-    use visualsign::test_utils::{
-        assert_has_field, assert_has_field_with_context, assert_has_field_with_value,
-        assert_has_field_with_value_with_context, assert_has_fields_with_values_with_context,
-    };
+    use visualsign::test_utils::{assert_has_field, assert_has_field_with_value};
 
     const CETUS_SWAP_LABEL: &str = "CetusAMM Swap Command";
 
@@ -1097,70 +1074,6 @@ mod tests {
 
     #[test]
     fn test_cetus_amm_aggregated() {
-        use serde::Deserialize;
-        use std::collections::HashMap;
-
-        #[derive(Debug, Deserialize)]
-        #[serde(untagged)]
-        enum OneOrMany {
-            One(String),
-            Many(Vec<String>),
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct Operation {
-            data: String,
-            asserts: HashMap<String, OneOrMany>,
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct Category {
-            label: String,
-            operations: HashMap<String, Operation>,
-        }
-
-        #[derive(Debug, Deserialize)]
-        struct AggregatedTestData {
-            explorer_tx_prefix: String,
-            #[serde(flatten)]
-            modules: HashMap<String, HashMap<String, Category>>,
-        }
-
-        let json_str = include_str!("aggregated_test_data.json");
-        let data: AggregatedTestData =
-            serde_json::from_str(json_str).expect("invalid aggregated_test_data.json");
-
-        // TODO: use module during visualization (in details)
-        for (_module_name, module) in data.modules.iter() {
-            for (name, category) in module.iter() {
-                let label = &category.label;
-                for (op_id, op) in category.operations.iter() {
-                    let test_context = format!(
-                        "Test name: {name}. Tx id: {}{op_id}",
-                        data.explorer_tx_prefix
-                    );
-
-                    let payload = payload_from_b64_with_context(&op.data, &test_context);
-
-                    assert_has_field_with_context(&payload, label, &test_context);
-                    for (field, expected) in op.asserts.iter() {
-                        match expected {
-                            OneOrMany::One(value) => assert_has_field_with_value_with_context(
-                                &payload,
-                                field,
-                                value.as_str(),
-                                &test_context,
-                            ),
-                            OneOrMany::Many(values) => assert_has_fields_with_values_with_context(
-                                &payload,
-                                field,
-                                values.as_slice(),
-                                &test_context,
-                            ),
-                        }
-                    }
-                }
-            }
-        }
+        run_aggregated_fixture(include_str!("aggregated_test_data.json"), "Cetus");
     }
 }

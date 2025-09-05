@@ -1,7 +1,7 @@
 use move_core_types::annotated_value::MoveTypeLayout;
 use move_core_types::language_storage::TypeTag;
 use move_core_types::runtime_value::MoveValue;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use sui_json::SuiJsonValue;
 use sui_json_rpc_types::{SuiCallArg, SuiPureValue};
 use visualsign::errors::VisualSignError;
@@ -17,11 +17,9 @@ where
         )),
         SuiCallArg::Pure(value) => match value.value_type() {
             None => {
-                let bytes = json_array_to_bytes(&value.value().to_json_value()).ok_or(
-                    VisualSignError::DecodeError(
-                        "Failed to convert call argument to JSON value".into(),
-                    ),
-                )?;
+                let bytes = json_array_to_bytes(&value.value().to_json_value()).map_err(|e| {
+                    VisualSignError::DecodeError(format!("Invalid pure value bytes: {e}"))
+                })?;
                 T::from_le_bytes(&bytes).map_err(|e| VisualSignError::DecodeError(e.to_string()))
             }
             Some(_) => T::from_move_value(value),
@@ -29,12 +27,20 @@ where
     }
 }
 
-fn json_array_to_bytes(value: &serde_json::Value) -> Option<Vec<u8>> {
-    value.as_array().map(|arr| {
-        arr.iter()
-            .filter_map(|v| v.as_u64().map(|n| n as u8))
-            .collect()
-    })
+fn json_array_to_bytes(value: &serde_json::Value) -> Result<Vec<u8>, String> {
+    let arr = value
+        .as_array()
+        .ok_or_else(|| "Expected JSON array for pure bytes".to_string())?;
+
+    arr.iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let n = v
+                .as_u64()
+                .ok_or_else(|| format!("Non-integer at index {i}"))?;
+            u8::try_from(n).map_err(|_| format!("Byte out of range at index {i}: {n}"))
+        })
+        .collect()
 }
 
 pub trait FromLeBytes: Sized {
@@ -87,7 +93,7 @@ impl FromLeBytes for u8 {
         Ok(u8::from_le_bytes(
             bytes
                 .try_into()
-                .map_err(|e| format!("Invalid u8 value: {}", e))?,
+                .map_err(|e| format!("Invalid u8 value: {e}"))?,
         ))
     }
 
@@ -122,7 +128,7 @@ impl FromLeBytes for u16 {
         Ok(u16::from_le_bytes(
             bytes
                 .try_into()
-                .map_err(|e| format!("Invalid u16 value: {}", e))?,
+                .map_err(|e| format!("Invalid u16 value: {e}"))?,
         ))
     }
 
@@ -157,7 +163,7 @@ impl FromLeBytes for u32 {
         Ok(u32::from_le_bytes(
             bytes
                 .try_into()
-                .map_err(|e| format!("Invalid u32 value: {}", e))?,
+                .map_err(|e| format!("Invalid u32 value: {e}"))?,
         ))
     }
 
@@ -192,7 +198,7 @@ impl FromLeBytes for u64 {
         Ok(u64::from_le_bytes(
             bytes
                 .try_into()
-                .map_err(|e| format!("Invalid u64 value: {}", e))?,
+                .map_err(|e| format!("Invalid u64 value: {e}"))?,
         ))
     }
 
@@ -227,7 +233,7 @@ impl FromLeBytes for u128 {
         Ok(u128::from_le_bytes(
             bytes
                 .try_into()
-                .map_err(|e| format!("Invalid u128 value: {}", e))?,
+                .map_err(|e| format!("Invalid u128 value: {e}"))?,
         ))
     }
 
