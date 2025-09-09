@@ -1,5 +1,7 @@
 use crate::core::instructions;
-use crate::core::txtypes::{decode_v0_transfers, decode_v0_instructions, create_address_lookup_table_field};
+use crate::core::txtypes::{
+    create_address_lookup_table_field, decode_v0_instructions, decode_v0_transfers,
+};
 use base64::{self, Engine};
 use solana_sdk::{
     message::VersionedMessage,
@@ -843,5 +845,89 @@ mod tests {
         }
 
         println!("✅ V0 transfer decoding infrastructure is working correctly");
+    }
+
+    #[test]
+    fn test_transaction_auto_detection_v0_vs_legacy() {
+        // Test the auto-detection logic in from_string() - V0 should be detected first
+        let v0_transaction = "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQAIEMb6evO+2606PWXzaqvJdDGxu+TC0vbg5HymAgNFL11hO9VYqgvLR5aQ58r++KhUxAMArXNUFouJhkNfk91xcdpfsw70khoY/pDZ7PZ6Utif//vUHTgWKYb1IOp28C3laonif5pJDmoFCEZLLM1jDQoBxbAzIjAnxzfida8KF8loqQWTFLbxtR33pCcsa4g/5IpH2dQ+PHkoCbIQgfspGmC7Pda2pnGc3R0WktKvNfpBJorRv4iVoUOTn784IlhxGbzCdMmWMCSVCNq8frVXYTEFUunuZBu0Welvi993TLZB9fJvij+ef7p3Rw8UE+ZQpngRVksq5ZjmYhxu6tmLviIDBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAAR51VvyMcBu7nTFbs5oFQf9sbLeo/SOUQKxzaJWvBOPBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEG3fbh12Whk9nL4UbO63msHLSF7V9bN5E6jPWFfv8AqUcn0nz5UKgy0QJ34xepN6SZQQ1LggwZ6QPHCYVaRRN9tD/6J/XX9kp0wJsfKVh53ksJqzbfyd1RSzIap7OM5ei1w1W367Ykl8/1heeE1Ct6pgMZQ89eFMSv0TWee6UaMMzWwUztGQ+UwdGRAWmsk+hsxTf7GSUoTLwaPEtoWnCSmZVQM4qi8IJmCZXye+3lj/svGc+s43La9Kg4Nwso+h0DCAAJAwQXAQAAAAAACRULAAIECQoJDQkODAUPAwcAAgQGAQsj5RfLl3rjrSoBAAAAMGQAAUBCDwAAAAAAhBlJAAAAAAAyAAALAwQAAAEJAA==";
+
+        // Test that V0 is detected correctly
+        let v0_wrapper = SolanaTransactionWrapper::from_string(v0_transaction).unwrap();
+        assert_eq!(v0_wrapper.transaction_type(), "Solana (V0)");
+        assert!(v0_wrapper.inner_versioned().is_some());
+        if let Some(versioned) = v0_wrapper.inner_versioned() {
+            assert!(matches!(versioned.message, VersionedMessage::V0(_)));
+        }
+
+        // Test legacy detection (this gets parsed as VersionedTransaction with Legacy message)
+        let legacy_message = "AgABA3Lgs31rdjnEG5FRyrm2uAi4f+erGdyJl0UtJyMMLGzC9wF+t3qhmhpj3vI369n5Ef5xRLms/Vn8J/Lc7bmoIkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMBafBISARibJ+I25KpHkjLe53ZrqQcLWGy8n97yWD7mAQICAQAMAgAAAADKmjsAAAAA";
+        let legacy_transaction = create_transaction_with_empty_signatures(legacy_message);
+
+        let legacy_wrapper = SolanaTransactionWrapper::from_string(&legacy_transaction).unwrap();
+        assert_eq!(legacy_wrapper.transaction_type(), "Solana (Legacy)");
+        assert!(legacy_wrapper.inner_versioned().is_some());
+        if let Some(versioned) = legacy_wrapper.inner_versioned() {
+            assert!(matches!(versioned.message, VersionedMessage::Legacy(_)));
+        }
+    }
+
+    #[test]
+    fn test_legacy_fallback_parsing() {
+        // Test that pure legacy transactions (not wrapped in VersionedTransaction) fall back correctly
+        // We need to create transaction data that fails VersionedTransaction parsing but succeeds legacy parsing
+
+        // This is a manually crafted legacy transaction that should fail VersionedTransaction deserialization
+        // but succeed with legacy Transaction deserialization
+        use solana_sdk::{
+            hash::Hash, message::Message, pubkey::Pubkey,
+            transaction::Transaction as SolanaTransaction,
+        };
+
+        // Create a minimal legacy transaction
+        let legacy_tx = SolanaTransaction {
+            signatures: vec![],
+            message: Message {
+                header: solana_sdk::message::MessageHeader {
+                    num_required_signatures: 1,
+                    num_readonly_signed_accounts: 0,
+                    num_readonly_unsigned_accounts: 1,
+                },
+                account_keys: vec![Pubkey::new_unique(), solana_sdk::system_program::ID],
+                recent_blockhash: Hash::new_unique(),
+                instructions: vec![],
+            },
+        };
+
+        // Serialize it as a legacy transaction
+        let legacy_bytes = bincode::serialize(&legacy_tx).unwrap();
+        let legacy_b64 = base64::engine::general_purpose::STANDARD.encode(legacy_bytes);
+
+        // Test that our parser handles it correctly
+        let wrapper = SolanaTransactionWrapper::from_string(&legacy_b64).unwrap();
+
+        // This should be detected correctly based on the transaction_type logic
+        let tx_type = wrapper.transaction_type();
+        assert!(
+            tx_type.contains("Legacy"),
+            "Should be detected as legacy, got: {}",
+            tx_type
+        );
+    }
+
+    #[test]
+    fn test_invalid_transaction_parsing() {
+        // Test that invalid data fails gracefully
+        let invalid_data = "invalid_base64_data!@#$";
+        let result = SolanaTransactionWrapper::from_string(invalid_data);
+        assert!(result.is_err(), "Invalid data should fail to parse");
+
+        // Test with valid base64 but invalid transaction structure
+        let invalid_tx_data = "SGVsbG8gV29ybGQ="; // "Hello World" in base64
+        let result = SolanaTransactionWrapper::from_string(invalid_tx_data);
+        assert!(
+            result.is_err(),
+            "Invalid transaction data should fail to parse"
+        );
     }
 }
