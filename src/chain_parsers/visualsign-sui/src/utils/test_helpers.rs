@@ -18,6 +18,7 @@
 
 use std::collections::HashMap;
 
+use crate::core::CommandVisualizer;
 use crate::transaction_string_to_visual_sign;
 
 use visualsign::SignablePayload;
@@ -26,7 +27,6 @@ use visualsign::test_utils::{
     assert_has_fields_with_values_with_context,
 };
 use visualsign::vsptrait::VisualSignOptions;
-use crate::core::{CommandVisualizer, VisualizerContext};
 
 pub fn payload_from_b64(data: &str) -> SignablePayload {
     transaction_string_to_visual_sign(
