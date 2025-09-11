@@ -966,6 +966,7 @@ impl CetusVisualizer {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_open_position_with_liquidity(
         context: &VisualizerContext,
         pwc: &SuiProgrammableMoveCall,

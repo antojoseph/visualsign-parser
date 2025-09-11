@@ -16,17 +16,20 @@
 //!
 //! As shown in the `cetus` and other presets, create a JSON file that matches this format and run the `run_aggregated_fixture` test.
 
+use crate::core::{CommandVisualizer, SuiModuleResolver, VisualizerContext};
+use crate::{SuiTransactionWrapper, transaction_string_to_visual_sign};
+
 use std::collections::HashMap;
 
-use crate::core::CommandVisualizer;
-use crate::transaction_string_to_visual_sign;
+use move_bytecode_utils::module_cache::SyncModuleCache;
+
+use sui_json_rpc_types::{
+    SuiTransactionBlockData, SuiTransactionBlockDataAPI, SuiTransactionBlockKind,
+};
 
 use visualsign::SignablePayload;
-use visualsign::test_utils::{
-    assert_has_field_with_context, assert_has_field_with_value_with_context,
-    assert_has_fields_with_values_with_context,
-};
-use visualsign::vsptrait::VisualSignOptions;
+use visualsign::test_utils::check_signable_payload_field;
+use visualsign::vsptrait::{Transaction, VisualSignOptions};
 
 pub fn payload_from_b64(data: &str) -> SignablePayload {
     transaction_string_to_visual_sign(
@@ -39,6 +42,7 @@ pub fn payload_from_b64(data: &str) -> SignablePayload {
     .expect("Failed to visualize tx commands")
 }
 
+#[allow(dead_code)]
 pub fn payload_from_b64_with_context(data: &str, context: &str) -> SignablePayload {
     match transaction_string_to_visual_sign(
         data,
@@ -63,6 +67,8 @@ pub enum OneOrMany {
 #[derive(Debug, serde::Deserialize)]
 pub struct Operation {
     pub data: String,
+    pub command_index: usize,
+    pub visualize_result_index: usize,
     pub asserts: HashMap<String, OneOrMany>,
 }
 
@@ -82,6 +88,7 @@ pub struct AggregatedTestData {
 /// Runs a standard aggregated test over protocol JSON fixtures.
 /// - `json_str`: contents of `aggregated_test_data.json` via `include_str`!
 /// - `protocol`: short name, used only in assertion context strings
+#[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
 pub fn run_aggregated_fixture(json_str: &str, protocol: Box<dyn CommandVisualizer>) {
     let data: AggregatedTestData =
         serde_json::from_str(json_str).expect("invalid aggregated_test_data.json");
@@ -91,28 +98,109 @@ pub fn run_aggregated_fixture(json_str: &str, protocol: Box<dyn CommandVisualize
         for (name, category) in module {
             let label = &category.label;
             for (op_id, op) in &category.operations {
-                let test_context = format!(
+                let test_info_context = format!(
                     "Test name: {name}. Tx id: {}{op_id}",
                     data.explorer_tx_prefix
                 );
 
-                let payload = payload_from_b64_with_context(&op.data, &test_context);
+                let block_data: SuiTransactionBlockData =
+                    SuiTransactionBlockData::try_from_with_module_cache(
+                        SuiTransactionWrapper::from_string(&op.data)
+                            .expect("Failed to parse transaction. {test_context}")
+                            .inner()
+                            .clone(),
+                        &SyncModuleCache::new(SuiModuleResolver),
+                    )
+                    .expect("Failed to convert transaction to block data. {test_context}");
 
-                assert_has_field_with_context(&payload, label, &test_context);
+                let (tx_commands, tx_inputs) = match block_data.transaction() {
+                    SuiTransactionBlockKind::ProgrammableTransaction(tx) => {
+                        (&tx.commands, &tx.inputs)
+                    }
+                    _ => {
+                        panic!("Transaction is not a programmable transaction. {test_info_context}")
+                    }
+                };
+
+                assert!(
+                    op.command_index < tx_commands.len(),
+                    "Command index is out of bounds. {test_info_context}"
+                );
+
+                let context = VisualizerContext::new(
+                    block_data.sender(),
+                    op.command_index,
+                    tx_commands,
+                    tx_inputs,
+                );
+
+                assert!(
+                    protocol.can_handle(&context),
+                    "Protocol {:?} cannot handle command with index: {}. {test_info_context}",
+                    protocol.kind(),
+                    op.command_index
+                );
+
+                let visualized_result = match protocol.visualize_tx_commands(&context) {
+                    Ok(result) => result,
+                    Err(e) => {
+                        panic!("Failed to visualize command. {test_info_context}. Error: {e}")
+                    }
+                };
+
+                assert!(
+                    op.visualize_result_index < visualized_result.len(),
+                    "Visualize result index is out of bounds. {test_info_context}"
+                );
+                let result_to_assert = visualized_result.get(op.visualize_result_index).unwrap();
+
+                let (label_found, _) =
+                    check_signable_payload_field(&result_to_assert.signable_payload_field, label);
+                assert!(
+                    label_found,
+                    "Should have a '{label}' field in {test_info_context}"
+                );
+
                 for (field, expected) in &op.asserts {
                     match expected {
-                        OneOrMany::One(value) => assert_has_field_with_value_with_context(
-                            &payload,
-                            field,
-                            value.as_str(),
-                            &test_context,
-                        ),
-                        OneOrMany::Many(values) => assert_has_fields_with_values_with_context(
-                            &payload,
-                            field,
-                            values.as_slice(),
-                            &test_context,
-                        ),
+                        OneOrMany::One(expected_value) => {
+                            let (found, actual_values) = check_signable_payload_field(
+                                &result_to_assert.signable_payload_field,
+                                field,
+                            );
+                            assert!(
+                                found,
+                                "Should have a '{field}' field with value {expected_value} in {test_info_context}"
+                            );
+                            assert!(
+                                actual_values.iter().all(|x| x.eq(expected_value)),
+                                "Should have a '{field}' field with value {expected_value}. Actual values: {actual_values:?} in {test_info_context}"
+                            );
+                        }
+                        OneOrMany::Many(expected_values) => {
+                            let (found, actual_values) = check_signable_payload_field(
+                                &result_to_assert.signable_payload_field,
+                                field,
+                            );
+
+                            assert!(
+                                found,
+                                "Should have at least one '{field}' field in {test_info_context}"
+                            );
+
+                            assert_eq!(
+                                actual_values.len(),
+                                expected_values.len(),
+                                "Should have {} '{field}' field(s) in {test_info_context}. Actual values: {actual_values:?}",
+                                expected_values.len()
+                            );
+
+                            assert_eq!(
+                                actual_values.as_slice(),
+                                expected_values.as_slice(),
+                                "Mismatch in '{field}' field values in {test_info_context}. Expected: {expected_values:?}, Actual: {actual_values:?}"
+                            );
+                        }
                     }
                 }
             }

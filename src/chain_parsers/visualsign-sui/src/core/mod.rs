@@ -19,6 +19,7 @@ use sui_types::base_types::SuiAddress;
 
 use ::visualsign::AnnotatedPayloadField;
 use ::visualsign::errors::VisualSignError;
+pub use helper::SuiModuleResolver;
 pub use visualsign::{
     SuiTransactionWrapper, SuiVisualSignConverter, transaction_string_to_visual_sign,
     transaction_to_visual_sign,
