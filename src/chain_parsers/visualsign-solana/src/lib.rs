@@ -26,6 +26,7 @@ mod tests {
                 VisualSignOptions {
                     decode_transfers: true,
                     transaction_name: Some("Unicode Escape Test".to_string()),
+                    partial_parsing: false,
                 },
             )
             .expect("Should convert to payload successfully");

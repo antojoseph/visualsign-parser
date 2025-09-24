@@ -1,6 +1,8 @@
+use alloy_primitives::hex;
 use std::fs;
 use std::path::PathBuf;
 use visualsign::vsptrait::VisualSignOptions;
+use visualsign_ethereum::partial_transaction::PartialEthereumTransaction;
 use visualsign_ethereum::transaction_string_to_visual_sign;
 
 // Helper function to get fixture path
@@ -33,6 +35,7 @@ fn test_with_fixtures() {
         let options = VisualSignOptions {
             decode_transfers: true,
             transaction_name: None,
+            partial_parsing: true,
         };
 
         let result = transaction_string_to_visual_sign(transaction_hex, options);
@@ -82,6 +85,7 @@ fn test_ethereum_charset_validation() {
         let options = VisualSignOptions {
             decode_transfers: true,
             transaction_name: None,
+            partial_parsing: false,
         };
 
         let result = transaction_string_to_visual_sign(transaction_hex, options);
@@ -137,4 +141,60 @@ fn test_ethereum_charset_validation() {
             }
         }
     }
+}
+
+#[test]
+fn test_empty_data_errors() {
+    // Test that empty data returns an error instead of made-up values
+    let empty_result = PartialEthereumTransaction::decode_partial(&[]);
+    assert!(
+        empty_result.is_err(),
+        "Empty data should return error, not made-up values"
+    );
+
+    // Test that minimal invalid data returns error instead of made-up values
+    let minimal_data = vec![0x01, 0x02];
+    let minimal_result = PartialEthereumTransaction::decode_partial(&minimal_data);
+    assert!(
+        minimal_result.is_err(),
+        "Minimal invalid data should return error, not made-up values"
+    );
+
+    // Test that completely invalid data returns error
+    let invalid_data = vec![0xff; 10]; // All 0xff bytes
+    let invalid_result = PartialEthereumTransaction::decode_partial(&invalid_data);
+    assert!(
+        invalid_result.is_err(),
+        "Invalid data should return error, not made-up values"
+    );
+
+    println!("✅ All empty data tests passed - decoder properly errors on invalid input");
+}
+
+#[test]
+fn test_original_partial_transaction() {
+    // Test the original failing transaction
+    let hex_data = "0xdf1180031482520894f39Fd6e51aad88F6F4ce6aB8827279cffFb922660180c0";
+    let clean_hex = hex_data.strip_prefix("0x").unwrap();
+    let bytes = hex::decode(clean_hex).expect("Valid hex");
+
+    println!("Testing transaction: {}", hex_data);
+    println!("Bytes: {:?}", bytes);
+    println!("First byte: 0x{:02x} ({})", bytes[0], bytes[0]);
+    println!("Length: {}", bytes.len());
+
+    let result = PartialEthereumTransaction::decode_partial(&bytes);
+    println!("Decode result: {:?}", result);
+
+    // This should succeed, not error
+    assert!(
+        result.is_ok(),
+        "Original partial transaction should decode successfully"
+    );
+
+    // Also test the hex function directly
+    use visualsign_ethereum::partial_transaction::decode_partial_transaction_from_hex;
+    let hex_result = decode_partial_transaction_from_hex(hex_data);
+    println!("Hex decode result: {:?}", hex_result);
+    assert!(hex_result.is_ok(), "Hex decode should also work");
 }
