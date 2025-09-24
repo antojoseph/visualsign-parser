@@ -444,9 +444,21 @@ async fn parser_charset_validation_all_chains() {
                 .unwrap_or_else(|e| panic!("{} should produce valid JSON: {:?}", description, e));
 
             // Verify required fields exist
-            assert!(parsed_json["Fields"].is_array(), "{} should have Fields array", description);
-            assert!(parsed_json["Title"].is_string(), "{} should have Title", description);
-            assert!(parsed_json["Version"].is_string(), "{} should have Version", description);
+            assert!(
+                parsed_json["Fields"].is_array(),
+                "{} should have Fields array",
+                description
+            );
+            assert!(
+                parsed_json["Title"].is_string(),
+                "{} should have Title",
+                description
+            );
+            assert!(
+                parsed_json["Version"].is_string(),
+                "{} should have Version",
+                description
+            );
 
             tracing::debug!("✅ {} passed charset validation", description);
         }
