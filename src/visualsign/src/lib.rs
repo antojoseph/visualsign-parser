@@ -1,6 +1,6 @@
 use crate::errors::VisualSignError;
-use serde::{Deserialize, Serialize, Serializer};
 use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value;
 pub mod encodings;
 pub mod errors;
@@ -135,7 +135,9 @@ pub enum SignablePayloadField {
 
 // Trait to ensure all SignablePayloadField variants implement serialization correctly
 trait FieldSerializer {
-    fn serialize_to_map(&self) -> Result<std::collections::BTreeMap<String, serde_json::Value>, serde_json::Error>;
+    fn serialize_to_map(
+        &self,
+    ) -> Result<std::collections::BTreeMap<String, serde_json::Value>, serde_json::Error>;
     fn get_expected_fields(&self) -> Vec<&'static str>;
 }
 
@@ -156,44 +158,62 @@ macro_rules! serialize_field_variant {
 
 // Implementation of FieldSerializer for SignablePayloadField
 impl FieldSerializer for SignablePayloadField {
-    fn serialize_to_map(&self) -> Result<std::collections::BTreeMap<String, serde_json::Value>, serde_json::Error> {
+    fn serialize_to_map(
+        &self,
+    ) -> Result<std::collections::BTreeMap<String, serde_json::Value>, serde_json::Error> {
         let mut fields = std::collections::HashMap::new();
 
         // Use the macro to serialize each variant - macro uses unwrap() internally
         match self {
             SignablePayloadField::Text { common, text } => {
                 serialize_field_variant!(fields, "text", common, ("Text", text));
-            },
+            }
             SignablePayloadField::TextV2 { common, text_v2 } => {
                 serialize_field_variant!(fields, "text_v2", common, ("TextV2", text_v2));
-            },
+            }
             SignablePayloadField::Address { common, address } => {
                 serialize_field_variant!(fields, "address", common, ("Address", address));
-            },
+            }
             SignablePayloadField::AddressV2 { common, address_v2 } => {
                 serialize_field_variant!(fields, "address_v2", common, ("AddressV2", address_v2));
-            },
+            }
             SignablePayloadField::Number { common, number } => {
                 serialize_field_variant!(fields, "number", common, ("Number", number));
-            },
+            }
             SignablePayloadField::Amount { common, amount } => {
                 serialize_field_variant!(fields, "amount", common, ("Amount", amount));
-            },
+            }
             SignablePayloadField::AmountV2 { common, amount_v2 } => {
                 serialize_field_variant!(fields, "amount_v2", common, ("AmountV2", amount_v2));
-            },
+            }
             SignablePayloadField::Divider { common, divider } => {
                 serialize_field_variant!(fields, "divider", common, ("Divider", divider));
-            },
-            SignablePayloadField::PreviewLayout { common, preview_layout } => {
-                serialize_field_variant!(fields, "preview_layout", common, ("PreviewLayout", preview_layout));
-            },
-            SignablePayloadField::ListLayout { common, list_layout } => {
-                serialize_field_variant!(fields, "list_layout", common, ("ListLayout", list_layout));
-            },
+            }
+            SignablePayloadField::PreviewLayout {
+                common,
+                preview_layout,
+            } => {
+                serialize_field_variant!(
+                    fields,
+                    "preview_layout",
+                    common,
+                    ("PreviewLayout", preview_layout)
+                );
+            }
+            SignablePayloadField::ListLayout {
+                common,
+                list_layout,
+            } => {
+                serialize_field_variant!(
+                    fields,
+                    "list_layout",
+                    common,
+                    ("ListLayout", list_layout)
+                );
+            }
             SignablePayloadField::Unknown { common, unknown } => {
                 serialize_field_variant!(fields, "unknown", common, ("Unknown", unknown));
-            },
+            }
         }
 
         // Convert to BTreeMap for alphabetical ordering
@@ -798,14 +818,20 @@ mod tests {
                 match self {
                     ExtendedSignablePayloadField::TextV2 { common, text_v2 } => {
                         serialize_field_variant!(fields, "text_v2", common, ("TextV2", text_v2));
-                    },
+                    }
                     // Adding the new Currency variant is just one line!
                     ExtendedSignablePayloadField::Currency { common, currency } => {
-                        serialize_field_variant!(fields, "currency", common, ("Currency", currency));
-                    },
+                        serialize_field_variant!(
+                            fields,
+                            "currency",
+                            common,
+                            ("Currency", currency)
+                        );
+                    }
                 }
 
-                let sorted_map: std::collections::BTreeMap<String, serde_json::Value> = fields.into_iter().collect();
+                let sorted_map: std::collections::BTreeMap<String, serde_json::Value> =
+                    fields.into_iter().collect();
                 let mut map_ser = serializer.serialize_map(Some(sorted_map.len()))?;
                 for (k, v) in sorted_map {
                     map_ser.serialize_entry(&k, &v)?;
@@ -893,7 +919,7 @@ mod tests {
         #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
         struct TestLocationField {
             #[serde(rename = "Latitude")]
-            latitude: String,  // Use string to avoid float comparison issues in tests
+            latitude: String, // Use string to avoid float comparison issues in tests
             #[serde(rename = "Longitude")]
             longitude: String,
             #[serde(rename = "Address")]
@@ -927,17 +953,33 @@ mod tests {
                 match self {
                     // Each new field type is just one line using the macro!
                     MultiExtendedSignablePayloadField::DateTime { common, date_time } => {
-                        serialize_field_variant!(fields, "date_time", common, ("DateTime", date_time));
-                    },
+                        serialize_field_variant!(
+                            fields,
+                            "date_time",
+                            common,
+                            ("DateTime", date_time)
+                        );
+                    }
                     MultiExtendedSignablePayloadField::Percentage { common, percentage } => {
-                        serialize_field_variant!(fields, "percentage", common, ("Percentage", percentage));
-                    },
+                        serialize_field_variant!(
+                            fields,
+                            "percentage",
+                            common,
+                            ("Percentage", percentage)
+                        );
+                    }
                     MultiExtendedSignablePayloadField::Location { common, location } => {
-                        serialize_field_variant!(fields, "location", common, ("Location", location));
-                    },
+                        serialize_field_variant!(
+                            fields,
+                            "location",
+                            common,
+                            ("Location", location)
+                        );
+                    }
                 }
 
-                let sorted_map: std::collections::BTreeMap<String, serde_json::Value> = fields.into_iter().collect();
+                let sorted_map: std::collections::BTreeMap<String, serde_json::Value> =
+                    fields.into_iter().collect();
                 let mut map_ser = serializer.serialize_map(Some(sorted_map.len()))?;
                 for (k, v) in sorted_map {
                     map_ser.serialize_entry(&k, &v)?;
@@ -1029,16 +1071,31 @@ mod tests {
 
         // Implement trait with MISSING field on purpose
         impl FieldSerializer for IncompleteTestField {
-            fn serialize_to_map(&self) -> Result<std::collections::BTreeMap<String, serde_json::Value>, serde_json::Error> {
+            fn serialize_to_map(
+                &self,
+            ) -> Result<std::collections::BTreeMap<String, serde_json::Value>, serde_json::Error>
+            {
                 let mut fields = std::collections::HashMap::new();
                 match self {
-                    IncompleteTestField::TestVariant { common, test_data: _ } => {
+                    IncompleteTestField::TestVariant {
+                        common,
+                        test_data: _,
+                    } => {
                         // Intentionally FORGET to serialize test_data to demonstrate detection
-                        fields.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
-                        fields.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
-                        fields.insert("Type".to_string(), serde_json::Value::String("test".to_string()));
+                        fields.insert(
+                            "FallbackText".to_string(),
+                            serde_json::to_value(&common.fallback_text).unwrap(),
+                        );
+                        fields.insert(
+                            "Label".to_string(),
+                            serde_json::to_value(&common.label).unwrap(),
+                        );
+                        fields.insert(
+                            "Type".to_string(),
+                            serde_json::Value::String("test".to_string()),
+                        );
                         // Missing: "TestData" field!
-                    },
+                    }
                 }
                 Ok(fields.into_iter().collect())
             }
@@ -1088,11 +1145,17 @@ mod tests {
         let result = serde_json::to_string(&incomplete_field);
 
         // This should FAIL because we forgot to serialize TestData
-        assert!(result.is_err(), "Expected serialization to fail due to missing TestData field");
+        assert!(
+            result.is_err(),
+            "Expected serialization to fail due to missing TestData field"
+        );
 
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("Missing expected field 'TestData'"),
-                "Error should mention missing TestData field, got: {}", error_msg);
+        assert!(
+            error_msg.contains("Missing expected field 'TestData'"),
+            "Error should mention missing TestData field, got: {}",
+            error_msg
+        );
 
         println!("✅ Successfully caught missing field serialization!");
         println!("   Error: {}", error_msg);
@@ -1118,13 +1181,16 @@ mod tests {
 
         // Implement trait with ALL required fields
         impl FieldSerializer for CompleteTestField {
-            fn serialize_to_map(&self) -> Result<std::collections::BTreeMap<String, serde_json::Value>, serde_json::Error> {
+            fn serialize_to_map(
+                &self,
+            ) -> Result<std::collections::BTreeMap<String, serde_json::Value>, serde_json::Error>
+            {
                 let mut fields = std::collections::HashMap::new();
                 match self {
                     CompleteTestField::TestVariant { common, test_data } => {
                         // Correctly serialize ALL fields
                         serialize_field_variant!(fields, "test", common, ("TestData", test_data));
-                    },
+                    }
                 }
                 Ok(fields.into_iter().collect())
             }
@@ -1173,7 +1239,11 @@ mod tests {
         };
 
         let result = serde_json::to_string(&complete_field);
-        assert!(result.is_ok(), "Expected serialization to succeed: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Expected serialization to succeed: {:?}",
+            result
+        );
 
         let json = result.unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -1230,8 +1300,12 @@ mod tests {
         for (i, field) in test_fields.iter().enumerate() {
             // Verify each field type serializes correctly with verification
             let result = serde_json::to_string(field);
-            assert!(result.is_ok(),
-                    "Field {} should serialize successfully: {:?}", i, result);
+            assert!(
+                result.is_ok(),
+                "Field {} should serialize successfully: {:?}",
+                i,
+                result
+            );
 
             let json = result.unwrap();
             let value: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -1242,20 +1316,35 @@ mod tests {
                 let mut expected_keys = keys.clone();
                 expected_keys.sort();
 
-                assert_eq!(keys, expected_keys,
-                          "Fields should be in alphabetical order for field {}: got {:?}", i, keys);
+                assert_eq!(
+                    keys, expected_keys,
+                    "Fields should be in alphabetical order for field {}: got {:?}",
+                    i, keys
+                );
 
                 // Verify all expected fields are present
                 let expected_field_count = field.get_expected_fields().len();
-                assert_eq!(keys.len(), expected_field_count,
-                          "Field {} should have exactly {} fields: {:?}", i, expected_field_count, keys);
+                assert_eq!(
+                    keys.len(),
+                    expected_field_count,
+                    "Field {} should have exactly {} fields: {:?}",
+                    i,
+                    expected_field_count,
+                    keys
+                );
 
-                println!("✅ Field {} verified: {} fields in alphabetical order: {:?}",
-                        i, keys.len(), keys);
+                println!(
+                    "✅ Field {} verified: {} fields in alphabetical order: {:?}",
+                    i,
+                    keys.len(),
+                    keys
+                );
             }
         }
 
-        println!("✅ All SignablePayloadField variants pass verification with alphabetical ordering!");
+        println!(
+            "✅ All SignablePayloadField variants pass verification with alphabetical ordering!"
+        );
     }
 
     #[test]
