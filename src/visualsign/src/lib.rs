@@ -1,5 +1,6 @@
 use crate::errors::VisualSignError;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
+use serde::ser::SerializeMap;
 use serde_json::Value;
 pub mod encodings;
 pub mod errors;
@@ -40,7 +41,7 @@ pub struct SignablePayloadFieldCommon {
 }
 
 // Now SignablePayloadField is an enum with variants for each field type
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "Type")]
 pub enum SignablePayloadField {
     #[serde(rename = "text")]
@@ -130,6 +131,94 @@ pub enum SignablePayloadField {
         #[serde(rename = "Unknown")]
         unknown: SignablePayloadFieldUnknown,
     },
+}
+
+// Custom Serialize implementation to ensure alphabetical field ordering
+impl Serialize for SignablePayloadField {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Use BTreeMap to ensure alphabetical ordering
+        let mut map = std::collections::BTreeMap::new();
+
+        // Add common fields (FallbackText and Label)
+        match self {
+            SignablePayloadField::Text { common, text } => {
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("Text".to_string(), serde_json::to_value(&text).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("text".to_string()));
+            }
+            SignablePayloadField::TextV2 { common, text_v2 } => {
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("TextV2".to_string(), serde_json::to_value(&text_v2).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("text_v2".to_string()));
+            }
+            SignablePayloadField::Address { common, address } => {
+                map.insert("Address".to_string(), serde_json::to_value(&address).unwrap());
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("address".to_string()));
+            }
+            SignablePayloadField::AddressV2 { common, address_v2 } => {
+                map.insert("AddressV2".to_string(), serde_json::to_value(&address_v2).unwrap());
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("address_v2".to_string()));
+            }
+            SignablePayloadField::Number { common, number } => {
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("Number".to_string(), serde_json::to_value(&number).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("number".to_string()));
+            }
+            SignablePayloadField::Amount { common, amount } => {
+                map.insert("Amount".to_string(), serde_json::to_value(&amount).unwrap());
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("amount".to_string()));
+            }
+            SignablePayloadField::AmountV2 { common, amount_v2 } => {
+                map.insert("AmountV2".to_string(), serde_json::to_value(&amount_v2).unwrap());
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("amount_v2".to_string()));
+            }
+            SignablePayloadField::Divider { common, divider } => {
+                map.insert("Divider".to_string(), serde_json::to_value(&divider).unwrap());
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("divider".to_string()));
+            }
+            SignablePayloadField::PreviewLayout { common, preview_layout } => {
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("PreviewLayout".to_string(), serde_json::to_value(&preview_layout).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("preview_layout".to_string()));
+            }
+            SignablePayloadField::ListLayout { common, list_layout } => {
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("ListLayout".to_string(), serde_json::to_value(&list_layout).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("list_layout".to_string()));
+            }
+            SignablePayloadField::Unknown { common, unknown } => {
+                map.insert("FallbackText".to_string(), serde_json::to_value(&common.fallback_text).unwrap());
+                map.insert("Label".to_string(), serde_json::to_value(&common.label).unwrap());
+                map.insert("Type".to_string(), serde_json::Value::String("unknown".to_string()));
+                map.insert("Unknown".to_string(), serde_json::to_value(&unknown).unwrap());
+            }
+        }
+
+        // Serialize the BTreeMap which maintains alphabetical order
+        let mut map_ser = serializer.serialize_map(Some(map.len()))?;
+        for (k, v) in map {
+            map_ser.serialize_entry(&k, &v)?;
+        }
+        map_ser.end()
+    }
 }
 
 // Helper methods for the enum
@@ -619,6 +708,63 @@ mod tests {
 
         let generated_json: Value = serde_json::from_str(&json).unwrap();
         assert_eq!(generated_json, expected_json);
+    }
+
+    #[test]
+    fn test_field_alphabetical_ordering() {
+        // Test that fields within SignablePayloadField are ordered alphabetically
+
+        // Test TextV2 field
+        let field = SignablePayloadField::TextV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "Test Fallback".to_string(),
+                label: "Test Label".to_string(),
+            },
+            text_v2: SignablePayloadFieldTextV2 {
+                text: "Test Text".to_string(),
+            },
+        };
+
+        let json = serde_json::to_string(&field).unwrap();
+        println!("TextV2 Field JSON: {}", json);
+
+        // Parse back to check field order
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        if let serde_json::Value::Object(map) = value {
+            let keys: Vec<_> = map.keys().cloned().collect();
+            println!("Keys in order: {:?}", keys);
+
+            // Expected order: FallbackText, Label, TextV2, Type
+            assert_eq!(keys, vec!["FallbackText", "Label", "TextV2", "Type"]);
+        } else {
+            panic!("Expected JSON object");
+        }
+
+        // Test AmountV2 field
+        let field2 = SignablePayloadField::AmountV2 {
+            common: SignablePayloadFieldCommon {
+                fallback_text: "0 ETH".to_string(),
+                label: "Value".to_string(),
+            },
+            amount_v2: SignablePayloadFieldAmountV2 {
+                amount: "0".to_string(),
+                abbreviation: Some("ETH".to_string()),
+            },
+        };
+
+        let json2 = serde_json::to_string(&field2).unwrap();
+        println!("AmountV2 Field JSON: {}", json2);
+
+        let value2: serde_json::Value = serde_json::from_str(&json2).unwrap();
+        if let serde_json::Value::Object(map) = value2 {
+            let keys: Vec<_> = map.keys().cloned().collect();
+            println!("Keys in order: {:?}", keys);
+
+            // Expected order: AmountV2, FallbackText, Label, Type
+            assert_eq!(keys, vec!["AmountV2", "FallbackText", "Label", "Type"]);
+        } else {
+            panic!("Expected JSON object");
+        }
     }
 
     #[test]
