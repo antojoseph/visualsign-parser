@@ -1,8 +1,8 @@
 // Example demonstrating compile-time checking for deterministic ordering
 
 use visualsign::{
-    assert_deterministic, DeterministicOrdering, SignablePayloadField,
-    SignablePayloadFieldCommon, SignablePayloadFieldTextV2,
+    assert_deterministic, DeterministicOrdering, SignablePayloadField, SignablePayloadFieldCommon,
+    SignablePayloadFieldTextV2,
 };
 
 // This function will only accept types that implement DeterministicOrdering
