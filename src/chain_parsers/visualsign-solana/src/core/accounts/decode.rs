@@ -301,7 +301,7 @@ mod tests {
             header: MessageHeader {
                 num_required_signatures: 2,        // indices 0,1 are signers
                 num_readonly_signed_accounts: 1,   // index 1 is readonly signer
-                num_readonly_unsigned_accounts: 1, // index 2 is readonly non-signer (index 3 is writable non-signer)
+                num_readonly_unsigned_accounts: 1, // index 3 is readonly non-signer (index 2 is writable non-signer) per Solana spec
             },
             account_keys: vec![account1, account2, account3, account4],
             recent_blockhash: Hash::new_unique(),
