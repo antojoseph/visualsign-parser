@@ -390,6 +390,84 @@ async fn parser_ethereum_native_transfer_e2e() {
 }
 
 #[tokio::test]
+async fn parser_charset_validation_all_chains() {
+    async fn test(test_args: TestArgs) {
+        // Test transactions for each supported chain
+        // These should all pass charset validation
+
+        // Solana transaction with Jupiter swap (previously had Unicode arrow issue)
+        let solana_jupiter_tx = "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAkSTXq/T5ciKTTbZJhKN+HNd2Q3/i8mDBxbxpek3krZ664CMz4dTWd4gwDq6aKU/sqHgTzleVA7bTCOy59kSOO+0EPkGS7bWuT/2yiCuaADtj/v6d+KwyTj46OQM2MjIq6hTqzVdwLTW8t+UsWMrwHEvc/r814OmVR9yLVQZujbWvpTh0XSNlF7uoIvuHyKD/16mBElrNa/eT8vB1KVUaN8IoaTvZbN4b7iiv8Q8cl5bDecNqCXzTS1Xmsmh5b2UVZniTbtX0AYG5QKiSDC10m0caM6frmEVukpjEWOk7F/0OzFKL0A0HdMWTIMuQj4xBuP3csLyGzVO/MXtPu6woNViO2O9ocxd1YSDcIwhrzHY3a9ewvycRH5q662TcQqdxD6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEedVb8jHAbu50xW7OaBUH/bGy3qP0jlECsc2iVrwTjwabiFf+q4GE+2h/Y0YYwDXaxDncGus7VZig8AAAAAABBt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKkOA2hfjpCQU+RYEhxm9adq7cdwaqEcgviqlSqPK3h5qVJNNVq4xx0JIWWE9kFLvpQK5lvS5UCde3W3QfWYLIxYjJclj04kifG7PRApFI4NgwtaE5na/xCEBI572Nvp+Fm0P/on9df2SnTAmx8pWHneSwmrNt/J3VFLMhqns4zl6Mb6evO+2606PWXzaqvJdDGxu+TC0vbg5HymAgNFL11hXuFhKBWRymmouYdcNxL6PjM1Bkcio0R+AtqA/P3C3jAFDwYABgALCQwBAQkCAAYMAgAAAEBCDwAAAAAADAEGAREKFQwABgUKEQoQCg0MAAQGAwUHCAECDiTlF8uXeuOtKgEAAAARAWQAAUBCDwAAAAAAtEADAAAAAAAyAAAMAwYAAAEJ";
+
+        // Ethereum transaction
+        let ethereum_tx = "0xf86c808504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83";
+
+        // Sui transaction
+        let sui_tx = "AAACACCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJCrze8SNFZ4kAAIAMqaOwAAAAACAgABAQEAAQECAAABAADW6S4ALibDr7IIgAHBtYILZPK8NRv9paI0Ksv59cHKwgHLSF74CguvkHmmIcQsiwy2XOmYbhyB/RbuiAOPAEpa7Rua1BcAAAAAIGOAX4LpV/FYmnpiNGs3y1rsDwwf9O10x5SdK7vXP+9Q1ukuAC4mw6+yCIABwbWCC2TyvDUb/aWiNCrL+fXBysLoAwAAAAAAAEBLTAAAAAAAAA==";
+
+        // Test each chain
+        let test_cases = vec![
+            (Chain::Solana, solana_jupiter_tx, "Solana with Jupiter swap"),
+            (Chain::Ethereum, ethereum_tx, "Ethereum transfer"),
+            (Chain::Sui, sui_tx, "Sui transfer"),
+        ];
+
+        for (chain, transaction, description) in test_cases {
+            let parse_request = ParseRequest {
+                unsigned_payload: transaction.to_string(),
+                chain: chain as i32,
+                chain_metadata: None,
+            };
+
+            let parse_response = test_args
+                .parser_client
+                .as_ref()
+                .unwrap()
+                .clone()
+                .parse(tonic::Request::new(parse_request))
+                .await
+                .unwrap_or_else(|e| panic!("Failed to parse {}: {:?}", description, e))
+                .into_inner();
+
+            let parsed_transaction = parse_response
+                .parsed_transaction
+                .unwrap_or_else(|| panic!("{} should have parsed transaction", description))
+                .payload
+                .unwrap_or_else(|| panic!("{} should have payload", description));
+
+            let json_str = &parsed_transaction.signable_payload;
+
+            // Validate charset safety - this will catch ANY non-ASCII characters
+            validate_safe_charset(json_str);
+
+            // Verify the JSON can be parsed
+            let parsed_json: serde_json::Value = serde_json::from_str(json_str)
+                .unwrap_or_else(|e| panic!("{} should produce valid JSON: {:?}", description, e));
+
+            // Verify required fields exist
+            assert!(
+                parsed_json["Fields"].is_array(),
+                "{} should have Fields array",
+                description
+            );
+            assert!(
+                parsed_json["Title"].is_string(),
+                "{} should have Title",
+                description
+            );
+            assert!(
+                parsed_json["Version"].is_string(),
+                "{} should have Version",
+                description
+            );
+
+            tracing::debug!("✅ {} passed charset validation", description);
+        }
+    }
+
+    integration::Builder::new().execute(test).await
+}
+
+#[tokio::test]
 async fn parser_sui_native_transfer_e2e() {
     async fn test(test_args: TestArgs) {
         let sui_tx_b64 = "AAACACCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJCrze8SNFZ4kAAIAMqaOwAAAAACAgABAQEAAQECAAABAADW6S4ALibDr7IIgAHBtYILZPK8NRv9paI0Ksv59cHKwgHLSF74CguvkHmmIcQsiwy2XOmYbhyB/RbuiAOPAEpa7Rua1BcAAAAAIGOAX4LpV/FYmnpiNGs3y1rsDwwf9O10x5SdK7vXP+9Q1ukuAC4mw6+yCIABwbWCC2TyvDUb/aWiNCrL+fXBysLoAwAAAAAAAEBLTAAAAAAAAA==";
