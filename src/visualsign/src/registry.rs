@@ -21,6 +21,7 @@ pub enum Chain {
     Aptos,
     Polkadot,
     Tron,
+    Cardano,
     // Add other chains as needed
     Custom(String), // For extensibility without modifying the enum
 }
@@ -36,6 +37,7 @@ impl Chain {
             Chain::Aptos => "Aptos",
             Chain::Polkadot => "Polkadot",
             Chain::Tron => "Tron",
+            Chain::Cardano => "Cardano",
             Chain::Custom(name) => name.as_str(),
         }
     }
@@ -54,6 +56,7 @@ impl FromStr for Chain {
             "aptos" => Chain::Aptos,
             "polkadot" => Chain::Polkadot,
             "tron" => Chain::Tron,
+            "cardano" => Chain::Cardano,
             _ => Chain::Custom(s.to_string()),
         })
     }
@@ -443,6 +446,7 @@ mod tests {
         assert_eq!(Chain::from_str("aptos"), Ok(Chain::Aptos));
         assert_eq!(Chain::from_str("polkadot"), Ok(Chain::Polkadot));
         assert_eq!(Chain::from_str("tron"), Ok(Chain::Tron));
+        assert_eq!(Chain::from_str("cardano"), Ok(Chain::Cardano));
         assert_eq!(
             Chain::from_str("unknown"),
             Ok(Chain::Custom("unknown".to_string()))
@@ -458,6 +462,7 @@ mod tests {
         assert_eq!(Chain::Aptos.as_str(), "Aptos");
         assert_eq!(Chain::Polkadot.as_str(), "Polkadot");
         assert_eq!(Chain::Tron.as_str(), "Tron");
+        assert_eq!(Chain::Cardano.as_str(), "Cardano");
         assert_eq!(Chain::Custom("MyChain".to_string()).as_str(), "MyChain");
     }
 }

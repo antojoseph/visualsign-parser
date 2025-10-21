@@ -23,6 +23,10 @@ pub fn create_registry() -> visualsign::registry::TransactionConverterRegistry {
         visualsign::registry::Chain::Tron,
         visualsign_tron::TronVisualSignConverter,
     );
+    registry.register::<visualsign_cardano::CardanoTransactionWrapper, _>(
+        visualsign::registry::Chain::Cardano,
+        visualsign_cardano::CardanoVisualSignConverter,
+    );
     registry.register::<visualsign_unspecified::UnspecifiedTransactionWrapper, _>(
         visualsign::registry::Chain::Unspecified,
         visualsign_unspecified::UnspecifiedVisualSignConverter,
