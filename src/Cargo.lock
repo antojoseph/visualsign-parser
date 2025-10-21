@@ -11460,10 +11460,6 @@ dependencies = [
 name = "visualsign-tron"
 version = "0.1.0"
 dependencies = [
- "alloy-consensus",
- "alloy-eips",
- "alloy-primitives",
- "alloy-rlp",
  "anychain-tron",
  "base58",
  "base64 0.22.1",

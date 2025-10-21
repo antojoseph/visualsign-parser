@@ -4,10 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-alloy-consensus = "1.0.20"
-alloy-eips = "1.0.20"
-alloy-primitives = "1.0.20"
-alloy-rlp = "0.3.12"
 anychain-tron = "0.2.13"
 base58 = "0.2"
 base64 = "0.22.1"

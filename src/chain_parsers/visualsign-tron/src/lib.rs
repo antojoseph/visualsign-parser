@@ -46,8 +46,9 @@ fn decode_transaction(
     })
 }
 
-// This is a standalone crate for handling unspecified or unknown transactions, mostly provided for testing and as a sample implementation template to start from
-/// Wrapper for unspecified/unknown transactions
+// This module provides a parser and wrapper for Tron blockchain transactions,
+// enabling their decoding and integration with the VisualSign framework.
+/// Wrapper for Tron transactions
 #[derive(Debug, Clone)]
 pub struct TronTransactionWrapper {
     transaction: transaction::Raw,
@@ -80,7 +81,7 @@ impl TronTransactionWrapper {
     }
 }
 
-/// Converter for unspecified/unknown chains
+/// Converter for Tron transactions
 pub struct TronVisualSignConverter;
 
 impl VisualSignConverter<TronTransactionWrapper> for TronVisualSignConverter {
@@ -106,29 +107,6 @@ fn convert_to_visual_sign_payload(
         },
         text_v2: SignablePayloadFieldTextV2 { text: chain_name },
     }];
-
-    // Calculate transaction ID by computing SHA256 of raw_data bytes
-    let raw_data_bytes = raw_data.write_to_bytes().map_err(|e| {
-        VisualSignError::ParseError(TransactionParseError::DecodeError(format!(
-            "Failed to serialize transaction: {}",
-            e
-        )))
-    })?;
-
-    let mut hasher = Sha256::new();
-    hasher.update(&raw_data_bytes);
-    let calculated_tx_id = hex::encode(hasher.finalize());
-
-    // Add Transaction ID field
-    fields.push(SignablePayloadField::TextV2 {
-        common: SignablePayloadFieldCommon {
-            fallback_text: calculated_tx_id.clone(),
-            label: "Transaction ID".to_string(),
-        },
-        text_v2: SignablePayloadFieldTextV2 {
-            text: calculated_tx_id,
-        },
-    });
 
     // Add timestamp field
     let timestamp_formatted = format_timestamp(raw_data.timestamp);
@@ -299,7 +277,7 @@ fn address_to_base58(address_bytes: &[u8]) -> String {
     let hash1 = hasher.finalize();
 
     let mut hasher = Sha256::new();
-    hasher.update(&hash1);
+    hasher.update(hash1);
     let hash2 = hasher.finalize();
 
     let mut with_checksum = address_bytes.to_vec();
