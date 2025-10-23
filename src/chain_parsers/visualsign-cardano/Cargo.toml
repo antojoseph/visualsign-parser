@@ -6,11 +6,8 @@ edition = "2024"
 [dependencies]
 base64 = "0.22.1"
 hex = "0.4.3"
-pallas = "0.30"
 pallas-codec = "0.30"
 pallas-crypto = "0.30"
 pallas-primitives = "0.30"
-pallas-addresses = "0.30"
-pallas-traverse = "0.30"
 thiserror = "2.0.12"
 visualsign = { workspace = true }
