@@ -18,8 +18,7 @@ pub fn assert_has_field_with_value(payload: &SignablePayload, label: &str, expec
     );
     assert!(
         values.contains(&expected_value.to_string()),
-        "Should have a {label} field with value {expected_value}. Actual values: {:?}",
-        values
+        "Should have a {label} field with value {expected_value}. Actual values: {values:?}"
     );
 }
 
@@ -36,8 +35,7 @@ pub fn assert_has_field_with_value_with_context(
     );
     assert!(
         values.iter().all(|x| x.eq(expected_value)),
-        "Should have a {label} field with value {expected_value}. Actual values: {:?} (use `assert_has_fields_with_values_with_context` if there could be different expected values) in {context}",
-        values
+        "Should have a {label} field with value {expected_value}. Actual values: {values:?} (use `assert_has_fields_with_values_with_context` if there could be different expected values) in {context}"
     );
 }
 
@@ -60,8 +58,7 @@ pub fn assert_has_fields_with_values_with_context(
 
     assert_eq!(
         values, expected,
-        "Mismatch in {label} field values in {context}. Expected: {:?}, Actual: {:?}",
-        expected, values
+        "Mismatch in {label} field values in {context}. Expected: {expected:?}, Actual: {values:?}"
     );
 }
 

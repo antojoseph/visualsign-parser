@@ -261,11 +261,11 @@ fn convert_v0_to_visual_sign_payload(
             // Add a note about instruction decoding failure
             fields.push(SignablePayloadField::TextV2 {
                 common: SignablePayloadFieldCommon {
-                    fallback_text: format!("Instruction decoding failed: {}", e),
+                    fallback_text: format!("Instruction decoding failed: {e}"),
                     label: "Instruction Decoding Note".to_string(),
                 },
                 text_v2: visualsign::SignablePayloadFieldTextV2 {
-                    text: format!("Instruction decoding failed: {}", e),
+                    text: format!("Instruction decoding failed: {e}"),
                 },
             });
         }
@@ -285,11 +285,11 @@ fn convert_v0_to_visual_sign_payload(
                 // Add a note about transfer decoding failure
                 fields.push(SignablePayloadField::TextV2 {
                     common: SignablePayloadFieldCommon {
-                        fallback_text: format!("Transfer decoding failed: {}", e),
+                        fallback_text: format!("Transfer decoding failed: {e}"),
                         label: "Transfer Decoding Note".to_string(),
                     },
                     text_v2: visualsign::SignablePayloadFieldTextV2 {
-                        text: format!("Transfer decoding failed: {}", e),
+                        text: format!("Transfer decoding failed: {e}"),
                     },
                 });
             }
@@ -375,7 +375,7 @@ mod tests {
         );
 
         if let Err(ref e) = payload_result {
-            println!("Error converting to payload: {:?}", e);
+            println!("Error converting to payload: {e:?}");
         }
         assert!(payload_result.is_ok());
 
@@ -430,7 +430,7 @@ mod tests {
             "✅ Jupiter transaction parsed successfully with {} fields",
             fields.len()
         );
-        println!("✅ Contains Jupiter content: {}", has_jupiter_content);
+        println!("✅ Contains Jupiter content: {has_jupiter_content}");
     }
 
     #[test]
@@ -456,7 +456,7 @@ mod tests {
         );
 
         if let Err(ref e) = payload_result {
-            println!("Error converting V0 to payload: {:?}", e);
+            println!("Error converting V0 to payload: {e:?}");
         }
         assert!(payload_result.is_ok());
 
@@ -492,7 +492,7 @@ mod tests {
             "✅ V0 transaction parsed successfully with {} fields",
             fields.len()
         );
-        println!("✅ Contains V0 content: {}", has_v0_content);
+        println!("✅ Contains V0 content: {has_v0_content}");
     }
 
     #[test]
@@ -591,7 +591,7 @@ mod tests {
                     }
                 }
                 Err(e) => {
-                    println!("❌ V0 transfer decoding failed: {:?}", e);
+                    println!("❌ V0 transfer decoding failed: {e:?}");
                     // This is expected for transactions without transfers, so it's not a failure
                 }
             }
@@ -696,8 +696,7 @@ mod tests {
         // The real test: V0 transfer decoding should work without failures
         println!("✅ V0 transfer decoding integration test completed");
         println!(
-            "Legacy has transfers: {}, V0 has transfer failures: {}",
-            legacy_has_transfers, v0_has_transfer_failures
+            "Legacy has transfers: {legacy_has_transfers}, V0 has transfer failures: {v0_has_transfer_failures}"
         );
 
         // Assert that we can at least call the V0 transfer decoding without it failing
@@ -800,7 +799,7 @@ mod tests {
                                 || field.fallback_text().contains("Transfer decoding failed")
                         });
 
-                        println!("Transfer decoding failures: {}", has_transfer_failures);
+                        println!("Transfer decoding failures: {has_transfer_failures}");
 
                         // Print all fields for inspection
                         for (i, field) in payload.fields.iter().enumerate() {
@@ -819,12 +818,12 @@ mod tests {
                         );
                     }
                     Err(e) => {
-                        panic!("V0 transaction conversion failed: {:?}", e);
+                        panic!("V0 transaction conversion failed: {e:?}");
                     }
                 }
             }
             Err(e) => {
-                println!("❌ Manually crafted V0 transfer decoding failed: {:?}", e);
+                println!("❌ Manually crafted V0 transfer decoding failed: {e:?}");
                 // This might happen if solana-parser has issues with our manually crafted transaction
                 // but the important thing is our code doesn't panic
                 println!(
@@ -899,8 +898,7 @@ mod tests {
         let tx_type = wrapper.transaction_type();
         assert!(
             tx_type.contains("Legacy"),
-            "Should be detected as legacy, got: {}",
-            tx_type
+            "Should be detected as legacy, got: {tx_type}"
         );
     }
 
@@ -973,6 +971,6 @@ mod tests {
 
         println!("✅ TokenKeg transaction parsed successfully");
         println!("Number of instruction fields: {}", instruction_fields.len());
-        println!("JSON output:\n{}", json_str);
+        println!("JSON output:\n{json_str}");
     }
 }

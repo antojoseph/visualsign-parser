@@ -30,7 +30,7 @@ impl InstructionVisualizer for SystemVisualizer {
         // Try to parse as system instruction
         let system_instruction = bincode::deserialize::<SystemInstruction>(&instruction.data)
             .map_err(|e| {
-                VisualSignError::DecodeError(format!("Failed to parse system instruction: {}", e))
+                VisualSignError::DecodeError(format!("Failed to parse system instruction: {e}"))
             })?;
 
         // Generate proper preview layout
@@ -68,7 +68,7 @@ fn create_system_preview_layout(
 
             let condensed_fields = vec![create_text_field(
                 "Instruction",
-                &format!("Transfer: {} lamports", lamports),
+                &format!("Transfer: {lamports} lamports"),
             )?];
 
             let expanded_fields = vec![
@@ -99,7 +99,7 @@ fn create_system_preview_layout(
 
             let preview_layout = visualsign::SignablePayloadFieldPreviewLayout {
                 title: Some(visualsign::SignablePayloadFieldTextV2 {
-                    text: format!("Transfer: {} lamports", lamports),
+                    text: format!("Transfer: {lamports} lamports"),
                 }),
                 subtitle: Some(visualsign::SignablePayloadFieldTextV2 {
                     text: String::new(),
@@ -142,7 +142,7 @@ fn create_system_preview_layout(
 
             let condensed_fields = vec![
                 create_text_field("Action", "Create Account")?,
-                create_text_field("Space", &format!("{} bytes", space))?,
+                create_text_field("Space", &format!("{space} bytes"))?,
                 create_text_field(
                     "Rent",
                     &format!("{} SOL", (*lamports as f64) / 1_000_000_000.0),
@@ -209,7 +209,7 @@ fn create_system_preview_layout(
             let expanded_fields = vec![
                 create_text_field("Action", &instruction_name)?,
                 create_text_field("Program", "System Program")?,
-                create_text_field("Instruction Data", &format!("{:?}", instruction))?,
+                create_text_field("Instruction Data", &format!("{instruction:?}"))?,
             ];
 
             let condensed = visualsign::SignablePayloadFieldListLayout {

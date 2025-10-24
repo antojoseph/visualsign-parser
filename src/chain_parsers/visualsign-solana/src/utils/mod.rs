@@ -75,14 +75,14 @@ pub fn format_token_amount(amount: u64, decimals: u8) -> String {
     let fractional = amount % divisor;
 
     if fractional == 0 {
-        format!("{}", whole)
+        format!("{whole}")
     } else {
         let fractional_str = format!("{:0width$}", fractional, width = decimals as usize);
         let trimmed = fractional_str.trim_end_matches('0');
         if trimmed.is_empty() {
-            format!("{}", whole)
+            format!("{whole}")
         } else {
-            format!("{}.{}", whole, trimmed)
+            format!("{whole}.{trimmed}")
         }
     }
 }
@@ -122,7 +122,7 @@ pub fn get_token_info(address: &str, amount: u64) -> SwapTokenInfo {
         SwapTokenInfo {
             address: address.to_string(),
             symbol: truncated.clone(),
-            name: format!("Unknown Token ({})", truncated),
+            name: format!("Unknown Token ({truncated})"),
             decimals: 0,
             amount,
             human_readable_amount: amount.to_string(),

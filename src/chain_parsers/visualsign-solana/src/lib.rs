@@ -22,7 +22,7 @@ mod tests {
         for (description, tx_data) in test_cases {
             // Parse the transaction
             let transaction_wrapper = SolanaTransactionWrapper::from_string(tx_data)
-                .unwrap_or_else(|e| panic!("Failed to parse {}: {:?}", description, e));
+                .unwrap_or_else(|e| panic!("Failed to parse {description}: {e:?}"));
 
             // Convert to VisualSign payload
             let payload = SolanaVisualSignConverter
@@ -34,7 +34,7 @@ mod tests {
                     },
                 )
                 .unwrap_or_else(|e| {
-                    panic!("Failed to convert {} to payload: {:?}", description, e)
+                    panic!("Failed to convert {description} to payload: {e:?}")
                 });
 
             // Test charset validation
@@ -60,15 +60,13 @@ mod tests {
             // Verify no unicode escapes are present
             assert!(
                 !json_string.contains("\\u"),
-                "{} JSON should not contain unicode escapes",
-                description
+                "{description} JSON should not contain unicode escapes"
             );
 
             // Verify the JSON is valid ASCII - this catches ALL non-ASCII characters
             assert!(
                 json_string.is_ascii(),
-                "{} JSON output should be ASCII only",
-                description
+                "{description} JSON output should be ASCII only"
             );
 
             tracing::info!("✅ {} passed charset validation", description);

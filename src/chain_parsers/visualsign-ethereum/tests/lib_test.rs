@@ -20,11 +20,11 @@ fn test_with_fixtures() {
     let fixtures_dir = fixture_path("");
 
     for test_name in FIXTURES {
-        let input_path = fixtures_dir.join(format!("{}.input", test_name));
+        let input_path = fixtures_dir.join(format!("{test_name}.input"));
 
         // Read input file contents
         let input_contents = fs::read_to_string(&input_path)
-            .unwrap_or_else(|_| panic!("Failed to read input file: {:?}", input_path));
+            .unwrap_or_else(|_| panic!("Failed to read input file: {input_path:?}"));
 
         // Parse the input to extract transaction data
         let transaction_hex = input_contents.trim();
@@ -40,25 +40,24 @@ fn test_with_fixtures() {
         let actual_output = match result {
             Ok(payload) => {
                 // Format the payload as a debug string or custom format
-                format!("{:#?}", payload)
+                format!("{payload:#?}")
             }
             Err(error) => {
-                format!("Error: {:?}", error)
+                format!("Error: {error:?}")
             }
         };
 
         // Construct expected output path
-        let expected_path = fixtures_dir.join(format!("{}.expected", test_name));
+        let expected_path = fixtures_dir.join(format!("{test_name}.expected"));
 
         // Read expected output
         let expected_output = fs::read_to_string(&expected_path)
-            .unwrap_or_else(|_| panic!("Expected output file not found: {:?}", expected_path));
+            .unwrap_or_else(|_| panic!("Expected output file not found: {expected_path:?}"));
 
         assert_eq!(
             actual_output.trim(),
             expected_output.trim(),
-            "Test case '{}' failed",
-            test_name
+            "Test case '{test_name}' failed",
         );
     }
 }
@@ -69,11 +68,11 @@ fn test_ethereum_charset_validation() {
     let fixtures_dir = fixture_path("");
 
     for test_name in FIXTURES {
-        let input_path = fixtures_dir.join(format!("{}.input", test_name));
+        let input_path = fixtures_dir.join(format!("{test_name}.input"));
 
         // Read input file contents
         let input_contents = fs::read_to_string(&input_path)
-            .unwrap_or_else(|_| panic!("Failed to read input file: {:?}", input_path));
+            .unwrap_or_else(|_| panic!("Failed to read input file: {input_path:?}"));
 
         // Parse the input to extract transaction data
         let transaction_hex = input_contents.trim();
@@ -113,9 +112,7 @@ fn test_ethereum_charset_validation() {
                 for escape in unicode_escapes {
                     assert!(
                         !json_string.contains(escape),
-                        "Ethereum parser JSON should not contain unicode escape {} for test case '{}', but found in: {}",
-                        escape,
-                        test_name,
+                        "Ethereum parser JSON should not contain unicode escape {escape} for test case '{test_name}', but found in: {}",
                         json_string.chars().take(200).collect::<String>()
                     );
                 }
@@ -123,16 +120,14 @@ fn test_ethereum_charset_validation() {
                 // Verify the JSON is valid ASCII
                 assert!(
                     json_string.is_ascii(),
-                    "Ethereum parser JSON output should be ASCII only for test case '{}'",
-                    test_name
+                    "Ethereum parser JSON output should be ASCII only for test case '{test_name}'",
                 );
             }
             Err(error) => {
                 // If parsing fails, that's okay for this test - we're only testing
                 // that successful parses produce valid charsets
                 eprintln!(
-                    "Skipping charset validation for test case '{}' due to parse error: {:?}",
-                    test_name, error
+                    "Skipping charset validation for test case '{test_name}' due to parse error: {error:?}",
                 );
             }
         }

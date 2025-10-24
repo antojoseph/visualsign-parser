@@ -64,14 +64,14 @@ fn verify_json_deterministic(value: &serde_json::Value, path: &str) -> Result<()
                 let new_path = if path.is_empty() {
                     key.clone()
                 } else {
-                    format!("{}.{}", path, key)
+                    format!("{path}.{key}")
                 };
                 verify_json_deterministic(nested_value, &new_path)?;
             }
         }
         serde_json::Value::Array(arr) => {
             for (i, item) in arr.iter().enumerate() {
-                let new_path = format!("{}[{}]", path, i);
+                let new_path = format!("{path}[{i}]");
                 verify_json_deterministic(item, &new_path)?;
             }
         }
@@ -838,10 +838,7 @@ impl SignablePayload {
     /// I understand that this might be overly cautious, but it's better to be safe at launch and incrementally open up unicode support later
     pub fn validate_charset(&self) -> Result<(), VisualSignError> {
         let json_str = self.to_json().map_err(|e| {
-            VisualSignError::SerializationError(format!(
-                "Failed to serialize for validation: {}",
-                e
-            ))
+            VisualSignError::SerializationError(format!("Failed to serialize for validation: {e}"))
         })?;
 
         // Check for unicode escapes
@@ -876,9 +873,8 @@ impl SignablePayload {
     /// Validates and returns the JSON string, ensuring charset safety
     pub fn to_validated_json(&self) -> Result<String, VisualSignError> {
         self.validate_charset()?;
-        self.to_json().map_err(|e| {
-            VisualSignError::SerializationError(format!("Serialization failed: {}", e))
-        })
+        self.to_json()
+            .map_err(|e| VisualSignError::SerializationError(format!("Serialization failed: {e}")))
     }
 }
 
@@ -920,7 +916,7 @@ mod tests {
         );
 
         let json = payload.to_json().unwrap();
-        println!("{}", json);
+        println!("{json}");
     }
 
     #[test]
@@ -999,7 +995,7 @@ mod tests {
             SignablePayload::new(15, "Withdraw".to_string(), None, fields, "".to_string());
 
         let json = payload.to_json().unwrap();
-        println!("{}", json);
+        println!("{json}");
 
         let expected_json = json!({
             "Version": "15",
@@ -1148,13 +1144,13 @@ mod tests {
         require_deterministic(&currency_field).unwrap();
 
         let json = serde_json::to_string(&currency_field).unwrap();
-        println!("New Currency Field JSON: {}", json);
+        println!("New Currency Field JSON: {json}");
 
         // Verify alphabetical ordering
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         if let serde_json::Value::Object(map) = value {
             let keys: Vec<_> = map.keys().cloned().collect();
-            println!("Currency Field Keys in order: {:?}", keys);
+            println!("Currency Field Keys in order: {keys:?}");
 
             // Expected order: Currency, FallbackText, Label, Type
             assert_eq!(keys, vec!["Currency", "FallbackText", "Label", "Type"]);
@@ -1174,12 +1170,12 @@ mod tests {
         };
 
         let json2 = serde_json::to_string(&text_field).unwrap();
-        println!("TextV2 Field JSON: {}", json2);
+        println!("TextV2 Field JSON: {json2}");
 
         let value2: serde_json::Value = serde_json::from_str(&json2).unwrap();
         if let serde_json::Value::Object(map) = value2 {
             let keys: Vec<_> = map.keys().cloned().collect();
-            println!("TextV2 Field Keys in order: {:?}", keys);
+            println!("TextV2 Field Keys in order: {keys:?}");
 
             // Expected order: FallbackText, Label, TextV2, Type
             assert_eq!(keys, vec!["FallbackText", "Label", "TextV2", "Type"]);
@@ -1254,7 +1250,7 @@ mod tests {
                 let keys: Vec<_> = bad_field_obj.keys().cloned().collect();
                 // Default serde ordering follows struct field order, not alphabetical
                 // So we expect: ["z_field", "a_field", "m_field"] not ["a_field", "m_field", "z_field"]
-                println!("Bad field keys (not alphabetical): {:?}", keys);
+                println!("Bad field keys (not alphabetical): {keys:?}");
                 assert_ne!(
                     keys,
                     vec!["a_field", "m_field", "z_field"],
@@ -1624,8 +1620,7 @@ mod tests {
                 for expected in &expected_fields {
                     if !actual_fields.contains(expected) {
                         return Err(serde::ser::Error::custom(format!(
-                            "Missing expected field '{}'. Expected: {:?}, Actual: {:?}",
-                            expected, expected_fields, actual_fields
+                            "Missing expected field '{expected}'. Expected: {expected_fields:?}, Actual: {actual_fields:?}",
                         )));
                     }
                 }
@@ -1658,12 +1653,11 @@ mod tests {
         let error_msg = result.unwrap_err().to_string();
         assert!(
             error_msg.contains("Missing expected field 'TestData'"),
-            "Error should mention missing TestData field, got: {}",
-            error_msg
+            "Error should mention missing TestData field, got: {error_msg}",
         );
 
         println!("✅ Successfully caught missing field serialization!");
-        println!("   Error: {}", error_msg);
+        println!("   Error: {error_msg}");
     }
 
     #[test]
@@ -1718,8 +1712,7 @@ mod tests {
                 for expected in &expected_fields {
                     if !actual_fields.contains(expected) {
                         return Err(serde::ser::Error::custom(format!(
-                            "Missing expected field '{}'. Expected: {:?}, Actual: {:?}",
-                            expected, expected_fields, actual_fields
+                            "Missing expected field '{expected}'. Expected: {expected_fields:?}, Actual: {actual_fields:?}",
                         )));
                     }
                 }
@@ -1746,8 +1739,7 @@ mod tests {
         let result = serde_json::to_string(&complete_field);
         assert!(
             result.is_ok(),
-            "Expected serialization to succeed: {:?}",
-            result
+            "Expected serialization to succeed: {result:?}",
         );
 
         let json = result.unwrap();
@@ -1759,7 +1751,7 @@ mod tests {
         }
 
         println!("✅ Correctly implemented field serialization passed verification!");
-        println!("   JSON: {}", json);
+        println!("   JSON: {json}");
     }
 
     #[test]
@@ -1807,9 +1799,7 @@ mod tests {
             let result = serde_json::to_string(field);
             assert!(
                 result.is_ok(),
-                "Field {} should serialize successfully: {:?}",
-                i,
-                result
+                "Field {i} should serialize successfully: {result:?}",
             );
 
             let json = result.unwrap();
@@ -1868,13 +1858,13 @@ mod tests {
         };
 
         let json = serde_json::to_string(&field).unwrap();
-        println!("TextV2 Field JSON: {}", json);
+        println!("TextV2 Field JSON: {json}");
 
         // Parse back to check field order
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         if let serde_json::Value::Object(map) = value {
             let keys: Vec<_> = map.keys().cloned().collect();
-            println!("Keys in order: {:?}", keys);
+            println!("Keys in order: {keys:?}");
 
             // Expected order: FallbackText, Label, TextV2, Type
             assert_eq!(keys, vec!["FallbackText", "Label", "TextV2", "Type"]);
@@ -1895,12 +1885,12 @@ mod tests {
         };
 
         let json2 = serde_json::to_string(&field2).unwrap();
-        println!("AmountV2 Field JSON: {}", json2);
+        println!("AmountV2 Field JSON: {json2}");
 
         let value2: serde_json::Value = serde_json::from_str(&json2).unwrap();
         if let serde_json::Value::Object(map) = value2 {
             let keys: Vec<_> = map.keys().cloned().collect();
-            println!("Keys in order: {:?}", keys);
+            println!("Keys in order: {keys:?}");
 
             // Expected order: AmountV2, FallbackText, Label, Type
             assert_eq!(keys, vec!["AmountV2", "FallbackText", "Label", "Type"]);
@@ -2298,7 +2288,7 @@ mod tests {
                     let new_path = if path.is_empty() {
                         key.clone()
                     } else {
-                        format!("{}.{}", path, key)
+                        format!("{path}.{key}")
                     };
                     assert_json_recursive_alphabetical(nested_value, &new_path);
                 }
@@ -2306,7 +2296,7 @@ mod tests {
             serde_json::Value::Array(arr) => {
                 // Recursively check array elements
                 for (i, item) in arr.iter().enumerate() {
-                    let new_path = format!("{}[{}]", path, i);
+                    let new_path = format!("{path}[{i}]");
                     assert_json_recursive_alphabetical(item, &new_path);
                 }
             }
@@ -2426,7 +2416,7 @@ mod tests {
     }
 
     fn assert_sorted_alphabetically(json: String) {
-        println!("Sorted JSON: {}", json);
+        println!("Sorted JSON: {json}");
         // ensure that ordering si preserved when using to_json()
         let pos_fields = json.find("Fields").unwrap_or(0);
         let pos_payload = json.find("PayloadType").unwrap_or(0);

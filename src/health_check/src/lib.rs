@@ -1,7 +1,7 @@
 //! Services for health checking QOS hosts. Intended to be adding to secure app
 //! hosts.
 
-//! #![forbid(unsafe_code)]
+//! #![`forbid(unsafe_code)`]
 #![deny(clippy::all, clippy::unwrap_used)]
 #![warn(missing_docs, clippy::pedantic)]
 #![allow(clippy::missing_errors_doc, clippy::module_name_repetitions)]

@@ -17,6 +17,7 @@ pub struct Processor {
 
 impl Processor {
     /// Creates a new request processor. The only argument needed is an ephemeral key handle.
+    #[must_use]
     pub fn new(handle: EphemeralKeyHandle) -> Arc<RwLock<Self>> {
         Arc::new(RwLock::new(Self { handle }))
     }
@@ -26,7 +27,7 @@ impl RequestProcessor for Processor {
     async fn process(&self, request: &[u8]) -> Vec<u8> {
         // We're doing a potentially CPU intensive blocking task, we shouldn't just lock the runtime
         tokio::task::block_in_place(move || {
-            let request = match QosParserRequest::decode(&*request)
+            let request = match QosParserRequest::decode(request)
                 // TODO: clean up this error handling, we can implement From/Into and probably clean this up meaningfully
                 .map_err(|e| {
                     qos_parser_response::Output::Status(Status {

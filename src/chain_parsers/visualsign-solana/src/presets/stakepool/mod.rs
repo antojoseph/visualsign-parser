@@ -94,7 +94,7 @@ fn parse_stake_pool_instruction(data: &[u8]) -> Result<StakePoolInstruction, Vis
     use borsh::de::BorshDeserialize;
 
     StakePoolInstruction::try_from_slice(data).map_err(|e| {
-        VisualSignError::DecodeError(format!("Failed to parse stakepool instruction: {}", e))
+        VisualSignError::DecodeError(format!("Failed to parse stakepool instruction: {e}"))
     })
 }
 

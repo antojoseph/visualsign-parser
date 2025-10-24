@@ -20,7 +20,7 @@ pub fn decode_v0_transfers(
     // Serialize the full versioned transaction
     let transaction_bytes = bincode::serialize(versioned_tx).map_err(|e| {
         VisualSignError::ParseError(visualsign::vsptrait::TransactionParseError::DecodeError(
-            format!("Failed to serialize V0 transaction: {}", e),
+            format!("Failed to serialize V0 transaction: {e}"),
         ))
     })?;
 
@@ -29,7 +29,7 @@ pub fn decode_v0_transfers(
     let parsed_transaction = parse_transaction(hex::encode(transaction_bytes), is_full_transaction)
         .map_err(|e| {
             VisualSignError::ParseError(visualsign::vsptrait::TransactionParseError::DecodeError(
-                format!("Failed to parse V0 transaction: {}", e),
+                format!("Failed to parse V0 transaction: {e}"),
             ))
         })?;
 
