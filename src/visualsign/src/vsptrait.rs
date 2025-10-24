@@ -321,7 +321,7 @@ mod tests {
         assert!(result.is_err());
         match result.unwrap_err() {
             VisualSignError::ParseError(_) => (),
-            err => panic!("Expected ParseError, got: {:?}", err),
+            err => panic!("Expected ParseError, got: {err:?}"),
         }
 
         // Test conversion error after successful parse
@@ -330,7 +330,7 @@ mod tests {
         assert!(result.is_err());
         match result.unwrap_err() {
             VisualSignError::ConversionError(_) => (),
-            err => panic!("Expected ConversionError, got: {:?}", err),
+            err => panic!("Expected ConversionError, got: {err:?}"),
         }
     }
 

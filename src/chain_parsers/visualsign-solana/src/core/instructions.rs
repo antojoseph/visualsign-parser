@@ -92,8 +92,7 @@ pub fn decode_transfers(
     )
     .map_err(|e| {
         VisualSignError::ParseError(TransactionParseError::DecodeError(format!(
-            "Failed to parse transaction: {}",
-            e
+            "Failed to parse transaction: {e}"
         )))
     })?;
 

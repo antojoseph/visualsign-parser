@@ -12,12 +12,12 @@ fn validate_json_structure(actual: &serde_json::Value, expected: &serde_json::Va
                 let current_path = if path.is_empty() {
                     key.clone()
                 } else {
-                    format!("{}.{}", path, key)
+                    format!("{path}.{key}")
                 };
 
                 let actual_value = actual_map
                     .get(key)
-                    .unwrap_or_else(|| panic!("Missing field '{}' in actual JSON", current_path));
+                    .unwrap_or_else(|| panic!("Missing field '{current_path}' in actual JSON"));
 
                 validate_json_structure(actual_value, expected_value, &current_path);
             }
@@ -35,15 +35,14 @@ fn validate_json_structure(actual: &serde_json::Value, expected: &serde_json::Va
             for (i, (actual_item, expected_item)) in
                 actual_arr.iter().zip(expected_arr.iter()).enumerate()
             {
-                let current_path = format!("{}[{}]", path, i);
+                let current_path = format!("{path}[{i}]");
                 validate_json_structure(actual_item, expected_item, &current_path);
             }
         }
         _ => {
             assert_eq!(
                 actual, expected,
-                "Value mismatch at '{}': expected {:?}, got {:?}",
-                path, expected, actual
+                "Value mismatch at '{path}': expected {expected:?}, got {actual:?}",
             );
         }
     }
@@ -59,15 +58,13 @@ fn validate_safe_charset(json_str: &str) {
     // Check for unicode escapes
     assert!(
         !json_str.contains("\\u"),
-        "JSON output contains unicode escape sequences: {}",
-        json_str
+        "JSON output contains unicode escape sequences: {json_str}",
     );
 
     // Use Rust's built-in ASCII validation - much simpler and more reliable
     assert!(
         json_str.is_ascii(),
-        "JSON output contains non-ASCII characters: {}",
-        json_str
+        "JSON output contains non-ASCII characters: {json_str}",
     );
 
     // Additional validation for printable characters (optional - can be more restrictive)
@@ -454,14 +451,14 @@ async fn parser_charset_validation_all_chains() {
                 .clone()
                 .parse(tonic::Request::new(parse_request))
                 .await
-                .unwrap_or_else(|e| panic!("Failed to parse {}: {:?}", description, e))
+                .unwrap_or_else(|e| panic!("Failed to parse {description}: {e:?}"))
                 .into_inner();
 
             let parsed_transaction = parse_response
                 .parsed_transaction
-                .unwrap_or_else(|| panic!("{} should have parsed transaction", description))
+                .unwrap_or_else(|| panic!("{description} should have parsed transaction"))
                 .payload
-                .unwrap_or_else(|| panic!("{} should have payload", description));
+                .unwrap_or_else(|| panic!("{description} should have payload"));
 
             let json_str = &parsed_transaction.signable_payload;
 
@@ -470,23 +467,20 @@ async fn parser_charset_validation_all_chains() {
 
             // Verify the JSON can be parsed
             let parsed_json: serde_json::Value = serde_json::from_str(json_str)
-                .unwrap_or_else(|e| panic!("{} should produce valid JSON: {:?}", description, e));
+                .unwrap_or_else(|e| panic!("{description} should produce valid JSON: {e:?}"));
 
             // Verify required fields exist
             assert!(
                 parsed_json["Fields"].is_array(),
-                "{} should have Fields array",
-                description
+                "{description} should have Fields array",
             );
             assert!(
                 parsed_json["Title"].is_string(),
-                "{} should have Title",
-                description
+                "{description} should have Title",
             );
             assert!(
                 parsed_json["Version"].is_string(),
-                "{} should have Version",
-                description
+                "{description} should have Version",
             );
 
             tracing::debug!("✅ {} passed charset validation", description);

@@ -1,5 +1,7 @@
 mod config;
 
+use std::fmt::Write;
+
 use config::{
     BorrowRequestIndexes, ClaimRewardsAndDepositIndexes, ClaimRewardsIndexes, Config,
     DepositCTokensIntoObligationIndexes, DepositLiquidityAndMintCTokensIndexes,
@@ -894,7 +896,8 @@ impl SuilendVisualizer {
         let subtitle_text = format!("From {}", truncate_address(&context.sender().to_string()));
 
         let mut summary = format!("Repay {} {} via {}", amount_str, coin.symbol(), package);
-        summary.push_str(&format!(" (reserve #{reserve_index})"));
+        write!(&mut summary, " (reserve #{reserve_index})")
+            .expect("templating a u64 into a string");
 
         let condensed = SignablePayloadFieldListLayout {
             fields: vec![create_text_field("Summary", &summary)?],

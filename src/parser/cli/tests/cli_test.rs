@@ -33,7 +33,7 @@ fn test_cli_with_fixtures() {
 
         // Read input file contents
         let input_contents = fs::read_to_string(&input_path)
-            .unwrap_or_else(|_| panic!("Failed to read input file: {:?}", input_path));
+            .unwrap_or_else(|_| panic!("Failed to read input file: {input_path:?}"));
 
         let mut command = Command::new(env!("CARGO_BIN_EXE_parser_cli"));
         for line in input_contents.lines() {
@@ -45,18 +45,18 @@ fn test_cli_with_fixtures() {
         // Run the CLI program with the input file
         let output = command
             .output()
-            .unwrap_or_else(|e| panic!("Failed to execute CLI: {}", e));
-        println!("Output {:?}: {:?}", test_name, output);
+            .unwrap_or_else(|e| panic!("Failed to execute CLI: {e}"));
+        println!("Output {test_name:?}: {output:?}");
 
         // Construct expected output path
-        let expected_path = fixtures_dir.join(format!("{}.expected", test_name));
+        let expected_path = fixtures_dir.join(format!("{test_name}.expected"));
 
         // Read expected output
         let expected_output = fs::read_to_string(&expected_path)
-            .unwrap_or_else(|_| panic!("Expected output file not found: {:?}", expected_path));
+            .unwrap_or_else(|_| panic!("Expected output file not found: {expected_path:?}"));
 
         let actual_output = String::from_utf8(output.stdout)
-            .unwrap_or_else(|e| panic!("Invalid UTF-8 output: {}", e));
+            .unwrap_or_else(|e| panic!("Invalid UTF-8 output: {e}"));
 
         let expected = expected_output.trim();
         let actual = actual_output.trim();
@@ -71,10 +71,10 @@ fn test_cli_with_fixtures() {
                     ChangeTag::Insert => "+",
                     ChangeTag::Equal => " ",
                 };
-                diff_output.push_str(&format!("{}{}", sign, change));
+                diff_output.push_str(&format!("{sign}{change}"));
             }
 
-            panic!("Test case '{}' failed:\n{}", test_name, diff_output);
+            panic!("Test case '{test_name}' failed:\n{diff_output}");
         }
     }
 }

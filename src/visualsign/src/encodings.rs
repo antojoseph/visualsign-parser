@@ -42,8 +42,7 @@ impl std::str::FromStr for SupportedEncodings {
             "base64" => Ok(Self::Base64),
             "hex" => Ok(Self::Hex),
             _ => Err(format!(
-                "Unsupported encoding format: {}. Supported formats are: base64, hex",
-                s
+                "Unsupported encoding format: {s}. Supported formats are: base64, hex"
             )),
         }
     }

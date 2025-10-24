@@ -2282,7 +2282,7 @@ pub fn get_chain_name(chain_id: Option<u64>) -> String {
         Some(920637907288165) => "Kakarot Starknet Sepolia".to_string(),
         Some(2713017997578000) => "DCHAIN Testnet".to_string(),
         Some(2716446429837000) => "DCHAIN".to_string(),
-        Some(chain_id) => format!("Unknown Network (Chain ID: {})", chain_id),
+        Some(chain_id) => format!("Unknown Network (Chain ID: {chain_id})"),
         None => "Unknown Network".to_string(),
     }
 }

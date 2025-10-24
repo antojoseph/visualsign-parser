@@ -32,8 +32,7 @@ impl InstructionVisualizer for ComputeBudgetVisualizer {
         let compute_budget_instruction =
             ComputeBudgetInstruction::try_from_slice(&instruction.data).map_err(|e| {
                 VisualSignError::DecodeError(format!(
-                    "Failed to parse compute budget instruction: {}",
-                    e
+                    "Failed to parse compute budget instruction: {e}"
                 ))
             })?;
 
@@ -105,19 +104,16 @@ impl InstructionVisualizer for ComputeBudgetVisualizer {
 fn format_compute_budget_instruction(instruction: &ComputeBudgetInstruction) -> String {
     match instruction {
         ComputeBudgetInstruction::RequestHeapFrame(bytes) => {
-            format!("Request Heap Frame: {} bytes", bytes)
+            format!("Request Heap Frame: {bytes} bytes")
         }
         ComputeBudgetInstruction::SetComputeUnitLimit(units) => {
-            format!("Set Compute Unit Limit: {} units", units)
+            format!("Set Compute Unit Limit: {units} units")
         }
         ComputeBudgetInstruction::SetComputeUnitPrice(micro_lamports) => {
-            format!(
-                "Set Compute Unit Price: {} micro-lamports per compute unit",
-                micro_lamports
-            )
+            format!("Set Compute Unit Price: {micro_lamports} micro-lamports per compute unit")
         }
         ComputeBudgetInstruction::SetLoadedAccountsDataSizeLimit(bytes) => {
-            format!("Set Loaded Accounts Data Size Limit: {} bytes", bytes)
+            format!("Set Loaded Accounts Data Size Limit: {bytes} bytes")
         }
         ComputeBudgetInstruction::Unused => "Unused Compute Budget Instruction".to_string(),
     }

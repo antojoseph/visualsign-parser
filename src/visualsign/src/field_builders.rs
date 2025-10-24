@@ -69,7 +69,7 @@ pub fn create_number_field(
     let fallback_text = if unit.is_empty() {
         number.to_string()
     } else {
-        format!("{} {}", number, unit)
+        format!("{number} {unit}")
     };
 
     Ok(AnnotatedPayloadField {
@@ -99,7 +99,7 @@ pub fn create_amount_field(
             abbreviation.to_string(),
         ));
     }
-    let fallback_text = format!("{} {}", amount, abbreviation);
+    let fallback_text = format!("{amount} {abbreviation}");
     Ok(AnnotatedPayloadField {
         static_annotation: None,
         dynamic_annotation: None,
@@ -147,7 +147,7 @@ pub fn create_address_field(
 
 fn default_hex_representation(data: &[u8]) -> String {
     data.iter()
-        .map(|byte| format!("{:02x}", byte))
+        .map(|byte| format!("{byte:02x}"))
         .collect::<Vec<String>>()
         .join("")
 }
@@ -240,7 +240,7 @@ mod tests {
             let err = create_number_field("Label", num, "unit").unwrap_err();
             match err {
                 VisualSignError::InvalidNumberField(ref s) if s == num => {}
-                _ => panic!("Expected InvalidNumberField error for {}", num),
+                _ => panic!("Expected InvalidNumberField error for {num}"),
             }
         }
     }
@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn test_create_amount_field_missing_abbreviation() {
         let err = create_amount_field("Label", "123", "").unwrap_err();
-        println!("Error: {:?}", err);
+        println!("Error: {err:?}");
         match err {
             VisualSignError::EmptyField(ref s) if s.is_empty() => {}
             _ => panic!("Expected EmptyField error"),

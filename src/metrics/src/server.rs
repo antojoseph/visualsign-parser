@@ -21,7 +21,7 @@ impl Server {
             .route("/metrics", get(Self::metrics))
             .with_state(Arc::new(collector));
 
-        println!("MetricsServer listening on {}", addr);
+        println!("MetricsServer listening on {addr}");
         axum::Server::bind(&addr)
             .serve(app.into_make_service())
             .await

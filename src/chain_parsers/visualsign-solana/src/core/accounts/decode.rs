@@ -234,11 +234,11 @@ pub fn create_accounts_advanced_preview_layout(
         summary_fields.push(AnnotatedPayloadField {
             signable_payload_field: SignablePayloadField::TextV2 {
                 common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} Writable", writable_non_signers),
+                    fallback_text: format!("{writable_non_signers} Writable"),
                     label: "Writable".to_string(),
                 },
                 text_v2: visualsign::SignablePayloadFieldTextV2 {
-                    text: format!("{} Writable", writable_non_signers),
+                    text: format!("{writable_non_signers} Writable"),
                 },
             },
             static_annotation: None,
@@ -250,11 +250,11 @@ pub fn create_accounts_advanced_preview_layout(
         summary_fields.push(AnnotatedPayloadField {
             signable_payload_field: SignablePayloadField::TextV2 {
                 common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} Read Only", readonly_non_signers),
+                    fallback_text: format!("{readonly_non_signers} Read Only"),
                     label: "Read Only".to_string(),
                 },
                 text_v2: visualsign::SignablePayloadFieldTextV2 {
-                    text: format!("{} Read Only", readonly_non_signers),
+                    text: format!("{readonly_non_signers} Read Only"),
                 },
             },
             static_annotation: None,

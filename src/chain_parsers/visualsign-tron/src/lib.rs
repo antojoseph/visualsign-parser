@@ -29,20 +29,17 @@ fn decode_transaction(
                 .strip_prefix("0x")
                 .unwrap_or(raw_transaction);
             hex::decode(clean_hex).map_err(|e| {
-                TronParserError::FailedToDecodeTransaction(format!("Failed to decode hex: {}", e))
+                TronParserError::FailedToDecodeTransaction(format!("Failed to decode hex: {e}"))
             })?
         }
         SupportedEncodings::Base64 => b64.decode(raw_transaction).map_err(|e| {
-            TronParserError::FailedToDecodeTransaction(format!("Failed to decode base64: {}", e))
+            TronParserError::FailedToDecodeTransaction(format!("Failed to decode base64: {e}"))
         })?,
     };
 
     // Parse and return the Tron transaction
     transaction::Raw::parse_from_bytes(&bytes).map_err(|e| {
-        TronParserError::FailedToDecodeTransaction(format!(
-            "Failed to parse Tron transaction: {}",
-            e
-        ))
+        TronParserError::FailedToDecodeTransaction(format!("Failed to parse Tron transaction: {e}"))
     })
 }
 

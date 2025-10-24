@@ -401,7 +401,7 @@ mod tests {
             JupiterSwapInstruction::Route { slippage_bps, .. } => {
                 assert_eq!(slippage_bps, 50, "Slippage should be 50 bps");
             }
-            _ => panic!("Expected Route instruction, got {:?}", parsed_instruction),
+            _ => panic!("Expected Route instruction, got {parsed_instruction:?}"),
         }
 
         // Test the formatting
