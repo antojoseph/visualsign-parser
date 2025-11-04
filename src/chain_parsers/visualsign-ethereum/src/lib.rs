@@ -1,7 +1,7 @@
 use alloy_consensus::{Transaction as _, TxType, TypedTransaction};
 use alloy_primitives::{U256, utils::format_units};
 use alloy_rlp::{Buf, Decodable};
-use alloy_sol_types::{SolCall, sol};
+use alloy_sol_types::sol;
 use base64::{Engine as _, engine::general_purpose::STANDARD as b64};
 use visualsign::{
     SignablePayload, SignablePayloadField, SignablePayloadFieldCommon, SignablePayloadFieldTextV2,
@@ -360,38 +360,6 @@ fn convert_to_visual_sign_payload(
         .transaction_name
         .unwrap_or_else(|| "Ethereum Transaction".to_string());
     SignablePayload::new(0, title, None, fields, "EthereumTx".to_string())
-}
-
-// Helper struct for ERC-20 transfers
-#[derive(Debug)]
-struct Erc20Transfer {
-    recipient: String,
-    amount: String,
-}
-
-fn decode_erc20_transfer(input: &[u8]) -> Option<Erc20Transfer> {
-    if input.len() < 4 {
-        return None;
-    }
-
-    // Try to decode as ERC-20 transfer (direct transfer)
-    if let Ok(call) = IERC20::transferCall::abi_decode(input) {
-        return Some(Erc20Transfer {
-            recipient: format!("{:?}", call.to),
-            amount: call.amount.to_string(),
-        });
-    }
-
-    // Try to decode as ERC-20 transferFrom (delegated transfer)
-    if let Ok(call) = IERC20::transferFromCall::abi_decode(input) {
-        return Some(Erc20Transfer {
-            recipient: format!("{:?}", call.to),
-            amount: call.amount.to_string(),
-            // Note: You might want to also capture the 'from' address for transferFrom
-        });
-    }
-
-    None
 }
 
 // Public API functions for ease of use
