@@ -29,50 +29,65 @@ pub enum JupiterSwapInstruction {
         in_token: Option<SwapTokenInfo>,
         out_token: Option<SwapTokenInfo>,
         slippage_bps: u16,
+        platform_fee_bps: u8,
     },
     ExactOutRoute {
         in_token: Option<SwapTokenInfo>,
         out_token: Option<SwapTokenInfo>,
         slippage_bps: u16,
+        platform_fee_bps: u8,
     },
     SharedAccountsRoute {
         in_token: Option<SwapTokenInfo>,
         out_token: Option<SwapTokenInfo>,
         slippage_bps: u16,
+        platform_fee_bps: u8,
     },
     Unknown,
 }
 
 impl JupiterSwapInstruction {
-    /// Parse amounts from the last 16 bytes of instruction data
-    fn parse_amounts_from_data(data: &[u8]) -> Result<(u64, u64), &'static str> {
-        if data.len() < 16 {
+    /// Parse amounts, slippage, and platform fee from instruction data
+    ///
+    /// Jupiter Route instruction format (suffix):
+    /// - 8 bytes: in_amount
+    /// - 8 bytes: out_amount
+    /// - 2 bytes: slippage_bps
+    /// - 1 byte: platform_fee_bps
+    ///
+    /// Total: 19 bytes at the end of instruction data
+    fn parse_amounts_and_slippage_from_data(
+        data: &[u8],
+    ) -> Result<(u64, u64, u16, u8), &'static str> {
+        if data.len() < 19 {
             return Err("Instruction data too short");
         }
 
         let len = data.len();
         let in_amount = u64::from_le_bytes([
+            data[len - 19],
+            data[len - 18],
+            data[len - 17],
             data[len - 16],
             data[len - 15],
             data[len - 14],
             data[len - 13],
             data[len - 12],
+        ]);
+        let out_amount = u64::from_le_bytes([
             data[len - 11],
             data[len - 10],
             data[len - 9],
-        ]);
-        let out_amount = u64::from_le_bytes([
             data[len - 8],
             data[len - 7],
             data[len - 6],
             data[len - 5],
             data[len - 4],
-            data[len - 3],
-            data[len - 2],
-            data[len - 1],
         ]);
+        let slippage_bps = u16::from_le_bytes([data[len - 3], data[len - 2]]);
+        let platform_fee_bps = data[len - 1];
 
-        Ok((in_amount, out_amount))
+        Ok((in_amount, out_amount, slippage_bps, platform_fee_bps))
     }
 }
 
@@ -182,7 +197,8 @@ fn parse_route_instruction(
     data: &[u8],
     accounts: &[String],
 ) -> Result<JupiterSwapInstruction, &'static str> {
-    let (in_amount, out_amount) = JupiterSwapInstruction::parse_amounts_from_data(data)?;
+    let (in_amount, out_amount, slippage_bps, platform_fee_bps) =
+        JupiterSwapInstruction::parse_amounts_and_slippage_from_data(data)?;
 
     let in_token = accounts.first().map(|addr| get_token_info(addr, in_amount));
     let out_token = accounts.get(1).map(|addr| get_token_info(addr, out_amount));
@@ -190,7 +206,8 @@ fn parse_route_instruction(
     Ok(JupiterSwapInstruction::Route {
         in_token,
         out_token,
-        slippage_bps: 50, // Default slippage
+        slippage_bps,
+        platform_fee_bps,
     })
 }
 
@@ -198,7 +215,8 @@ fn parse_exact_out_route_instruction(
     data: &[u8],
     accounts: &[String],
 ) -> Result<JupiterSwapInstruction, &'static str> {
-    let (in_amount, out_amount) = JupiterSwapInstruction::parse_amounts_from_data(data)?;
+    let (in_amount, out_amount, slippage_bps, platform_fee_bps) =
+        JupiterSwapInstruction::parse_amounts_and_slippage_from_data(data)?;
 
     let in_token = accounts.first().map(|addr| get_token_info(addr, in_amount));
     let out_token = accounts.get(1).map(|addr| get_token_info(addr, out_amount));
@@ -206,7 +224,8 @@ fn parse_exact_out_route_instruction(
     Ok(JupiterSwapInstruction::ExactOutRoute {
         in_token,
         out_token,
-        slippage_bps: 50, // Default slippage
+        slippage_bps,
+        platform_fee_bps,
     })
 }
 
@@ -214,7 +233,8 @@ fn parse_shared_accounts_route_instruction(
     data: &[u8],
     accounts: &[String],
 ) -> Result<JupiterSwapInstruction, &'static str> {
-    let (in_amount, out_amount) = JupiterSwapInstruction::parse_amounts_from_data(data)?;
+    let (in_amount, out_amount, slippage_bps, platform_fee_bps) =
+        JupiterSwapInstruction::parse_amounts_and_slippage_from_data(data)?;
 
     let in_token = accounts.first().map(|addr| get_token_info(addr, in_amount));
     let out_token = accounts.get(1).map(|addr| get_token_info(addr, out_amount));
@@ -222,7 +242,8 @@ fn parse_shared_accounts_route_instruction(
     Ok(JupiterSwapInstruction::SharedAccountsRoute {
         in_token,
         out_token,
-        slippage_bps: 50, // Default slippage
+        slippage_bps,
+        platform_fee_bps,
     })
 }
 
@@ -232,16 +253,19 @@ fn format_jupiter_swap_instruction(instruction: &JupiterSwapInstruction) -> Stri
             in_token,
             out_token,
             slippage_bps,
+            platform_fee_bps,
         }
         | JupiterSwapInstruction::ExactOutRoute {
             in_token,
             out_token,
             slippage_bps,
+            platform_fee_bps,
         }
         | JupiterSwapInstruction::SharedAccountsRoute {
             in_token,
             out_token,
             slippage_bps,
+            platform_fee_bps,
         } => {
             let instruction_type = match instruction {
                 JupiterSwapInstruction::Route { .. } => "Jupiter Swap",
@@ -252,15 +276,22 @@ fn format_jupiter_swap_instruction(instruction: &JupiterSwapInstruction) -> Stri
                 _ => unreachable!(),
             };
 
-            format!(
-                "{}: From {} {} To {} {} (slippage: {}bps)",
+            let mut result = format!(
+                "{}: From {} {} To {} {} (slippage: {}bps",
                 instruction_type,
                 format_token_amount(in_token),
                 format_token_symbol(in_token),
                 format_token_amount(out_token),
                 format_token_symbol(out_token),
                 slippage_bps
-            )
+            );
+
+            if *platform_fee_bps > 0 {
+                result.push_str(&format!(", platform fee: {platform_fee_bps}bps"));
+            }
+
+            result.push(')');
+            result
         }
         JupiterSwapInstruction::Unknown => "Jupiter: Unknown Instruction".to_string(),
     }
@@ -295,16 +326,19 @@ fn create_jupiter_swap_expanded_fields(
             in_token,
             out_token,
             slippage_bps,
+            platform_fee_bps,
         }
         | JupiterSwapInstruction::ExactOutRoute {
             in_token,
             out_token,
             slippage_bps,
+            platform_fee_bps,
         }
         | JupiterSwapInstruction::SharedAccountsRoute {
             in_token,
             out_token,
             slippage_bps,
+            platform_fee_bps,
         } => {
             // Add input token fields
             if let Some(token) = in_token {
@@ -343,6 +377,14 @@ fn create_jupiter_swap_expanded_fields(
                 create_number_field("Slippage", &slippage_bps.to_string(), "bps")
                     .map_err(|e| VisualSignError::ConversionError(e.to_string()))?,
             );
+
+            // Add platform fee field if non-zero
+            if *platform_fee_bps > 0 {
+                fields.push(
+                    create_number_field("Platform Fee", &platform_fee_bps.to_string(), "bps")
+                        .map_err(|e| VisualSignError::ConversionError(e.to_string()))?,
+                );
+            }
         }
         JupiterSwapInstruction::Unknown => {
             fields.push(
@@ -383,7 +425,8 @@ mod tests {
             0x01, 0x00, 0x00, 0x00, 0x26, 0x64, 0x00, 0x00, // Additional data
             0xa0, 0x86, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Input amount: 100000
             0x93, 0x3e, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Output amount: 99150
-            0x32, 0x00, // Slippage: 50 bps
+            0x0a, 0x00, // Slippage: 10 bps
+            0x00, // Platform fee: 0 bps
         ];
 
         // Mock accounts for testing
@@ -399,7 +442,7 @@ mod tests {
         // Verify it parsed as a Route instruction
         match parsed_instruction {
             JupiterSwapInstruction::Route { slippage_bps, .. } => {
-                assert_eq!(slippage_bps, 50, "Slippage should be 50 bps");
+                assert_eq!(slippage_bps, 10, "Slippage should be 10 bps");
             }
             _ => panic!("Expected Route instruction, got {parsed_instruction:?}"),
         }
@@ -411,7 +454,7 @@ mod tests {
             "Formatted string should contain 'Jupiter'"
         );
         assert!(
-            formatted.contains("50bps"),
+            formatted.contains("10bps"),
             "Formatted string should contain slippage"
         );
 
@@ -460,7 +503,8 @@ mod tests {
             0x01, 0x00, 0x00, 0x00, 0x26, 0x64, 0x00, 0x00, // Additional data
             0xa0, 0x86, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Input amount: 100000
             0x93, 0x3e, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Output amount: 99150
-            0x32, 0x00, // Slippage: 50 bps
+            0x0a, 0x00, // Slippage: 10 bps
+            0x00, // Platform fee: 0 bps
         ];
 
         let accounts = vec!["JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4".to_string()];
@@ -471,7 +515,7 @@ mod tests {
         // Verify parsing result using pattern matching
         match result {
             JupiterSwapInstruction::Route { slippage_bps, .. } => {
-                assert_eq!(slippage_bps, 50);
+                assert_eq!(slippage_bps, 10);
 
                 // Create fields and verify their structure
                 let fields = create_jupiter_swap_expanded_fields(
@@ -582,30 +626,38 @@ mod tests {
     #[test]
     fn test_jupiter_discriminator_matching() {
         // Test that our discriminators match correctly
-        // Each instruction needs at least 24 bytes: 8 for discriminator + 16 for amounts (in_amount + out_amount)
+        // Each instruction needs at least 27 bytes: 8 for discriminator + 16 for amounts + 2 for slippage + 1 for platform_fee
         let route_data = [
             0xe5, 0x17, 0xcb, 0x97, 0x7a, 0xe3, 0xad, 0x2a, // discriminator
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // padding/intermediate data
             0x00, 0xe1, 0xf5, 0x05, 0x00, 0x00, 0x00, 0x00, // in_amount (100000000)
             0x00, 0xc2, 0xeb, 0x0b, 0x00, 0x00, 0x00, 0x00, // out_amount (200000000)
+            0x0a, 0x00, // slippage (10 bps)
+            0x00, // platform_fee_bps (0 bps)
         ];
         let exact_out_data = [
             0x4b, 0xd7, 0xdf, 0xa8, 0x0c, 0xd0, 0xb6, 0x2a, // discriminator
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // padding/intermediate data
             0x00, 0xe1, 0xf5, 0x05, 0x00, 0x00, 0x00, 0x00, // in_amount (100000000)
             0x00, 0xc2, 0xeb, 0x0b, 0x00, 0x00, 0x00, 0x00, // out_amount (200000000)
+            0x0a, 0x00, // slippage (10 bps)
+            0x00, // platform_fee_bps (0 bps)
         ];
         let shared_accounts_data = [
             0x3a, 0xf2, 0xaa, 0xae, 0x2f, 0xb6, 0xd4, 0x2a, // discriminator
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // padding/intermediate data
             0x00, 0xe1, 0xf5, 0x05, 0x00, 0x00, 0x00, 0x00, // in_amount (100000000)
             0x00, 0xc2, 0xeb, 0x0b, 0x00, 0x00, 0x00, 0x00, // out_amount (200000000)
+            0x0a, 0x00, // slippage (10 bps)
+            0x00, // platform_fee_bps (0 bps)
         ];
         let unknown_data = [
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // unknown discriminator
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // padding/intermediate data
             0x00, 0xe1, 0xf5, 0x05, 0x00, 0x00, 0x00, 0x00, // in_amount (100000000)
             0x00, 0xc2, 0xeb, 0x0b, 0x00, 0x00, 0x00, 0x00, // out_amount (200000000)
+            0x0a, 0x00, // slippage (10 bps)
+            0x00, // platform_fee_bps (0 bps)
         ];
 
         let accounts = vec!["test".to_string()];
@@ -639,5 +691,72 @@ mod tests {
             }
             _ => panic!("Unknown discriminator should return Unknown variant"),
         }
+    }
+
+    #[test]
+    fn test_jupiter_with_platform_fee() {
+        // Test Jupiter Route instruction with non-zero platform fee
+        let instruction_data = [
+            0xe5, 0x17, 0xcb, 0x97, 0x7a, 0xe3, 0xad, 0x2a, // Route discriminator
+            0x01, 0x00, 0x00, 0x00, 0x26, 0x64, 0x00, 0x00, // Additional data
+            0x00, 0xe1, 0xf5, 0x05, 0x00, 0x00, 0x00, 0x00, // in_amount (100000000)
+            0x00, 0xc2, 0xeb, 0x0b, 0x00, 0x00, 0x00, 0x00, // out_amount (200000000)
+            0x32, 0x00, // slippage (50 bps)
+            0x64, // platform_fee_bps (100 bps)
+        ];
+
+        let accounts = vec!["JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4".to_string()];
+
+        // Parse the instruction
+        let result = parse_jupiter_swap_instruction(&instruction_data, &accounts).unwrap();
+
+        // Verify parsing
+        match result {
+            JupiterSwapInstruction::Route {
+                slippage_bps,
+                platform_fee_bps,
+                ..
+            } => {
+                assert_eq!(slippage_bps, 50, "Slippage should be 50 bps");
+                assert_eq!(platform_fee_bps, 100, "Platform fee should be 100 bps");
+                println!("✅ Correctly parsed slippage: {slippage_bps} bps");
+                println!("✅ Correctly parsed platform fee: {platform_fee_bps} bps");
+            }
+            _ => panic!("Expected Route instruction"),
+        }
+
+        // Test the formatting includes platform fee
+        let formatted = format_jupiter_swap_instruction(&result);
+        assert!(
+            formatted.contains("50bps"),
+            "Formatted string should contain slippage"
+        );
+        assert!(
+            formatted.contains("platform fee: 100bps"),
+            "Formatted string should contain platform fee when non-zero"
+        );
+        println!("✅ Formatted output: {formatted}");
+
+        // Test expanded fields include platform fee
+        let fields = create_jupiter_swap_expanded_fields(
+            &result,
+            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+            &instruction_data,
+        )
+        .unwrap();
+
+        // Check that we have a Platform Fee field
+        let platform_fee_field = fields.iter().find(|f| {
+            if let SignablePayloadField::Number { common, .. } = &f.signable_payload_field {
+                common.label == "Platform Fee"
+            } else {
+                false
+            }
+        });
+        assert!(
+            platform_fee_field.is_some(),
+            "Should have Platform Fee field when platform_fee_bps > 0"
+        );
+        println!("✅ Platform Fee field present in expanded fields");
     }
 }
