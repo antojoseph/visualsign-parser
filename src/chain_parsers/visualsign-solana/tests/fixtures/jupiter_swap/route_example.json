@@ -1,0 +1,166 @@
+{
+  "description": "Account",
+  "source": "https://solscan.io/tx/441ttot8CzpgsiRHvAHnNTCBwbSnPuhuy43pCjzZU9BKwBuJeW8f4TMU7FYLeqBst6WJeMEHprdQxr4thxqZSxRs",
+  "signature": "441ttot8CzpgsiRHvAHnNTCBwbSnPuhuy43pCjzZU9BKwBuJeW8f4TMU7FYLeqBst6WJeMEHprdQxr4thxqZSxRs",
+  "cluster": "mainnet-beta",
+  "full_transaction_note": "This transaction has 6 instructions. The Jupiter instruction is at index 4.",
+  "instruction_index": 4,
+  "instruction_data": "8gKxDaCUhQVtYEpLAEXpKEYshjkYgM8mjv4s27FCdzQSyLQUbmy",
+  "program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "accounts": [
+    {
+      "pubkey": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "signer": false,
+      "writable": true,
+      "description": "Token program (SPL Token)"
+    },
+    {
+      "pubkey": "B7hSadyLX8YhNT8RDcK8RbnR3KAfX4HbWvV89XmeqitA",
+      "signer": true,
+      "writable": true,
+      "description": "User wallet"
+    },
+    {
+      "pubkey": "3c5JEJ3un3HZAtWvZ77nhNGxDGqmWM7uZ1cx4bGDsKE8",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "FAXnNWMXbadmfMTfWtEu3WDymtRwsxYLGdbKoJbfLKsK",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "signer": false,
+      "writable": true,
+      "description": "Jupiter program"
+    },
+    {
+      "pubkey": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "signer": false,
+      "writable": true,
+      "description": "Jupiter program"
+    },
+    {
+      "pubkey": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "signer": false,
+      "writable": true,
+      "description": "Jupiter program"
+    },
+    {
+      "pubkey": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "signer": false,
+      "writable": true,
+      "description": "Token program (SPL Token)"
+    },
+    {
+      "pubkey": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "signer": false,
+      "writable": true,
+      "description": "Token program (SPL Token)"
+    },
+    {
+      "pubkey": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+      "signer": false,
+      "writable": true,
+      "description": "Memo program"
+    },
+    {
+      "pubkey": "B7hSadyLX8YhNT8RDcK8RbnR3KAfX4HbWvV89XmeqitA",
+      "signer": true,
+      "writable": true,
+      "description": "User wallet"
+    },
+    {
+      "pubkey": "CCifuNxNLBZV9ch94GQ4QgdrmbBdG13xDfReomzqvhMC",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "So11111111111111111111111111111111111111112",
+      "signer": false,
+      "writable": true,
+      "description": "Wrapped SOL"
+    },
+    {
+      "pubkey": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "3c5JEJ3un3HZAtWvZ77nhNGxDGqmWM7uZ1cx4bGDsKE8",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "4iBF54K8AY5dbwFZL8JBktqDrRvAnEkBs42aSRDYB14p",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "FAXnNWMXbadmfMTfWtEu3WDymtRwsxYLGdbKoJbfLKsK",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "3YYrbiosq79pthXhFV8MwXThXWgb4Wn85fMiqPoo8dq4",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "FdV51SZanY1thtYtseN5enYiASp78r7gtEcTo3xxg1eS",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "4ThAi4HvBnXpgjBs5BDUQHosHjqMc1G6b9L88Djq1Ue8",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "EHmLbEKVdix9brJJ13ey5o3VHo2f8w8Rr5NEwhBtHrrT",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    },
+    {
+      "pubkey": "68sWwn3c2exPMnAGe2STD3LFAc97bVBvGaGCHSEctK1",
+      "signer": false,
+      "writable": true,
+      "description": "Account"
+    }
+  ],
+  "expected_fields": {
+    "program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "slippage": "50"
+  }
+}
