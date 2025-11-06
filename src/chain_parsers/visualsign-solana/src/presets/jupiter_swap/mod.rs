@@ -759,5 +759,5 @@ mod tests {
         );
         println!("✅ Platform Fee field present in expanded fields");
     }
-    mod tests;
+    mod fixture_test;
 }
