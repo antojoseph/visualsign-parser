@@ -48,9 +48,9 @@ fn load_fixture(name: &str) -> TestFixture {
         name
     );
     let fixture_content = std::fs::read_to_string(&fixture_path)
-        .unwrap_or_else(|e| panic!("Failed to read fixture {}: {}", fixture_path, e));
+        .unwrap_or_else(|e| panic!("Failed to read fixture {fixture_path}: {e}"));
     serde_json::from_str(&fixture_content)
-        .unwrap_or_else(|e| panic!("Failed to parse fixture {}: {}", fixture_path, e))
+        .unwrap_or_else(|e| panic!("Failed to parse fixture {fixture_path}: {e}"))
 }
 
 fn create_instruction_from_fixture(fixture: &TestFixture) -> Instruction {
@@ -92,7 +92,7 @@ fn test_route_real_transaction() {
     println!("Signature: {}", fixture.signature);
     println!("Cluster: {}", fixture.cluster);
     if let Some(note) = &fixture.full_transaction_note {
-        println!("Transaction Context: {}", note);
+        println!("Transaction Context: {note}");
     }
     println!();
 
@@ -102,7 +102,7 @@ fn test_route_real_transaction() {
     // Create a context - using index 0 since we only loaded the one relevant instruction
     // In reality, the fixture.instruction_index would be used with all transaction instructions
     let sender = SolanaAccount {
-        account_key: fixture.accounts.get(0).unwrap().pubkey.clone(),
+        account_key: fixture.accounts.first().unwrap().pubkey.clone(),
         signer: false,
         writable: false,
     };
@@ -149,7 +149,7 @@ fn test_route_real_transaction() {
         for (key, expected_value) in &fixture.expected_fields {
             let expected_str = expected_value
                 .as_str()
-                .unwrap_or_else(|| panic!("Expected field '{}' is not a string", key));
+                .unwrap_or_else(|| panic!("Expected field '{key}' is not a string"));
 
             if let Some(expanded) = &preview_layout.expanded {
                 let found =
@@ -166,7 +166,7 @@ fn test_route_real_transaction() {
 
                                 if label_matches {
                                     if value_matches {
-                                        println!("✓ {}: {} (matches)", key, expected_str);
+                                        println!("✓ {key}: {expected_str} (matches)");
                                     } else {
                                         println!(
                                             "✗ {}: expected '{}', got '{}'",
@@ -186,7 +186,7 @@ fn test_route_real_transaction() {
 
                                 if label_matches {
                                     if value_matches {
-                                        println!("✓ {}: {} (matches)", key, expected_str);
+                                        println!("✓ {key}: {expected_str} (matches)");
                                     } else {
                                         println!(
                                             "✗ {}: expected '{}', got '{}'",
@@ -206,7 +206,7 @@ fn test_route_real_transaction() {
 
                                 if label_matches {
                                     if value_matches {
-                                        println!("✓ {}: {} (matches)", key, expected_str);
+                                        println!("✓ {key}: {expected_str} (matches)");
                                     } else {
                                         println!(
                                             "✗ {}: expected '{}', got '{}'",
@@ -221,13 +221,12 @@ fn test_route_real_transaction() {
                         });
 
                 if !found {
-                    println!("✗ {}: field not found in output", key);
+                    println!("✗ {key}: field not found in output");
                 }
 
                 assert!(
                     found,
-                    "Expected field '{}' with value '{}' not found in visualization",
-                    key, expected_str
+                    "Expected field '{key}' with value '{expected_str}' not found in visualization"
                 );
             }
         }
