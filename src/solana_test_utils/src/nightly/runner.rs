@@ -11,14 +11,15 @@ use std::time::Instant;
 pub type ParserClient = Box<dyn std::any::Any + Send + Sync>;
 
 /// Runner for nightly Jupiter trading pair tests
+///
+/// Can be used with or without Surfpool:
+/// - Without Surfpool: Uses live RPC (Helius) for real mainnet transactions
+/// - With Surfpool: Uses local Solana fork for controlled testing environment
 pub struct NightlyTestRunner {
     config: PairsConfig,
-    #[allow(dead_code)]
     surfpool: Option<SurfpoolManager>,
     fetcher: TransactionFetcher,
-    #[allow(dead_code)]
     fixture_manager: FixtureManager,
-    #[allow(dead_code)]
     parser_client: Option<ParserClient>,
 }
 
@@ -56,6 +57,11 @@ impl NightlyTestRunner {
         }
     }
 
+    /// Get RPC client if Surfpool is available
+    pub fn rpc_client(&self) -> Option<solana_client::rpc_client::RpcClient> {
+        self.surfpool.as_ref().map(|s| s.rpc_client())
+    }
+
     /// Run tests for all enabled trading pairs
     pub async fn run_all_pairs(&mut self) -> Result<TestReport> {
         let start = Instant::now();
@@ -63,6 +69,10 @@ impl NightlyTestRunner {
 
         let enabled_pairs = self.config.enabled_pairs();
         tracing::info!("Running tests for {} enabled pairs", enabled_pairs.len());
+
+        if self.surfpool.is_some() {
+            tracing::info!("✓ Using Surfpool for local testing");
+        }
 
         for pair in enabled_pairs {
             tracing::info!("Testing pair: {}", pair.name);

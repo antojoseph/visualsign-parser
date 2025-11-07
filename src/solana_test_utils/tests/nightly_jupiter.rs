@@ -19,33 +19,14 @@ async fn test_nightly_jupiter_pairs() {
             return;
         }
 
+        tracing::info!("✓ Using Helius API for transaction data");
+
         // Load configuration (or use default)
         let config = load_config();
 
-        // Create transaction fetcher
+        // Create transaction fetcher (uses Helius API)
         let fetcher = TransactionFetcher::from_env()
             .expect("Failed to create transaction fetcher");
-
-        // Start Surfpool only if explicitly enabled AND Helius is not available
-        let surfpool = if std::env::var("SURFPOOL_ENABLED").is_ok() && !TransactionFetcher::is_available() {
-            match SurfpoolManager::start(SurfpoolConfig::default()).await {
-                Ok(s) => {
-                    tracing::info!("✓ Surfpool started successfully");
-                    Some(s)
-                }
-                Err(e) => {
-                    tracing::warn!("⚠️  Failed to start Surfpool: {}. Continuing without it.", e);
-                    None
-                }
-            }
-        } else {
-            if TransactionFetcher::is_available() {
-                tracing::info!("Helius API available - using live transactions (Surfpool not needed)");
-            } else {
-                tracing::info!("Surfpool disabled (set SURFPOOL_ENABLED=1 to enable)");
-            }
-            None
-        };
 
         // Set up fixture directory
         let fixture_dir = get_fixture_dir();
@@ -53,7 +34,7 @@ async fn test_nightly_jupiter_pairs() {
 
         // Create test runner with parser client
         let parser_client = Box::new(test_args.parser_client.unwrap());
-        let mut runner = NightlyTestRunner::new(config, surfpool, fetcher, fixture_dir.clone(), parser_client);
+        let mut runner = NightlyTestRunner::new(config, None, fetcher, fixture_dir.clone(), parser_client);
 
     // Run all pairs
     tracing::info!("🚀 Starting nightly Jupiter pairs test");
