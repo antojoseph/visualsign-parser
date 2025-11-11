@@ -1022,13 +1022,11 @@ fn format_token_instruction_summary(
             authority_type,
             new_authority,
         } => {
-            #[allow(unreachable_patterns)]
             let authority_type = match authority_type {
                 SplAuthorityType::AccountOwner => "AccountOwner",
                 SplAuthorityType::CloseAccount => "CloseAccount",
                 SplAuthorityType::FreezeAccount => "FreezeAccount",
                 SplAuthorityType::MintTokens => "MintTokens",
-                _ => "Other",
             };
             let target = new_authority
                 .map(|pk| pk.to_string())
