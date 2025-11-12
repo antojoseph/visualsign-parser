@@ -64,7 +64,7 @@ message Metadata {
 }
 
 message SignatureMetadata {
-  string value = 1;                    // Signature of content hash (computed over parent content using algorithm in metadata; algorithm specified in metadata)
+  string value = 1;                    // Signature of content hash (computed over parent content using algorithm specified in metadata)
   repeated Metadata metadata = 2;      // Generic metadata about the signature (e.g., algorithm, issuer, timestamp as key-value pairs)
 }
 
