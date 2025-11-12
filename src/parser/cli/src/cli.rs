@@ -1,7 +1,7 @@
 use crate::chains;
 use chains::{available_chains, parse_chain};
 use clap::{Arg, Command};
-use generated::parser::{EthereumMetadata, parse_request::ChainMetadata};
+use generated::parser::{EthereumMetadata, Abi, Idl, SolanaMetadata, SolanaIdlType, parse_request::ChainMetadata};
 use parser_app::registry::create_registry;
 use visualsign::vsptrait::VisualSignOptions;
 
@@ -77,7 +77,23 @@ impl Cli {
                 Arg::new("abi")
                     .long("abi")
                     .value_name("ABI_JSON")
-                    .help("Contract ABI as a JSON string")
+                    .help("(Ethereum) Contract ABI as a JSON string")
+                    .required(false),
+            )
+            .arg(
+                Arg::new("idl")
+                    .long("idl")
+                    .value_name("IDL_JSON")
+                    .help("(Solana) Program IDL as a JSON string (default: Anchor)")
+                    .required(false),
+            )
+            .arg(
+                Arg::new("idl-type")
+                    .long("idl-type")
+                    .value_name("IDL_TYPE")
+                    .help("(Solana) IDL type (default: anchor)")
+                    .value_parser(["anchor"])
+                    .default_value("anchor")
                     .required(false),
             )
             .get_matches();
@@ -92,25 +108,51 @@ impl Cli {
             .get_one::<String>("output")
             .expect("Output format has default value");
         let abi = matches.get_one::<String>("abi").cloned();
+        let idl = matches.get_one::<String>("idl").cloned();
+        let idl_type = matches
+            .get_one::<String>("idl-type")
+            .expect("IDL type has default value");
 
-        let options = if chain == "ethereum" {
-            VisualSignOptions {
-                decode_transfers: true,
-                transaction_name: None,
-                metadata: abi.map(|abi_str| {
-                    ChainMetadata::Ethereum(EthereumMetadata {
-                        abi: Some(generated::parser::Abi {
-                            value: abi_str,
-                            signature: None,
-                        }),
-                    })
-                }),
+        let options = match chain.as_str() {
+            "ethereum" => {
+                VisualSignOptions {
+                    decode_transfers: true,
+                    transaction_name: None,
+                    metadata: abi.map(|abi_str| {
+                        ChainMetadata::Ethereum(EthereumMetadata {
+                            abi: Some(Abi {
+                                value: abi_str,
+                                signature: None,
+                            }),
+                        })
+                    }),
+                }
             }
-        } else {
-            VisualSignOptions {
-                decode_transfers: true,
-                transaction_name: None,
-                metadata: None,
+            "solana" => {
+                VisualSignOptions {
+                    decode_transfers: true,
+                    transaction_name: None,
+                    metadata: idl.map(|idl_str| {
+                        let idl_type_enum = match idl_type.as_str() {
+                            "anchor" | _ => SolanaIdlType::Anchor,
+                        };
+                        ChainMetadata::Solana(SolanaMetadata {
+                            idl: Some(Idl {
+                                value: idl_str,
+                                idl_type: idl_type_enum as i32,
+                                idl_version: None,
+                                signature: None,
+                            }),
+                        })
+                    }),
+                }
+            }
+            _ => {
+                VisualSignOptions {
+                    decode_transfers: true,
+                    transaction_name: None,
+                    metadata: None,
+                }
             }
         };
 
