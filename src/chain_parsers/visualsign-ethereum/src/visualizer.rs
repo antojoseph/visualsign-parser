@@ -19,6 +19,9 @@ pub trait ContractVisualizer: Send + Sync {
     /// * `Ok(Some(fields))` - Successfully visualized into annotated fields
     /// * `Ok(None)` - This visualizer cannot handle this call
     /// * `Err(error)` - Error during visualization
+    ///
+    /// # TODO
+    /// Return hashed data of chain metadata as part of the response
     fn visualize(
         &self,
         context: &VisualizerContext,
