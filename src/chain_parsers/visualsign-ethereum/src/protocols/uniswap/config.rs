@@ -109,12 +109,12 @@ impl UniswapConfig {
     /// This registers tokens like WETH across multiple chains so they can be
     /// resolved by symbol during transaction visualization.
     pub fn register_common_tokens(registry: &mut ContractRegistry) {
-        // WETH on Ethereum Mainnet
+        // WETH on Ethereum Mainnet (WETH9 contract)
         registry.register_token(
             1,
             TokenMetadata {
                 symbol: "WETH".to_string(),
-                name: "Wrapped Ether".to_string(),
+                name: "WETH9".to_string(),
                 erc_standard: ErcStandard::Erc20,
                 contract_address: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2".to_string(),
                 decimals: 18,
@@ -126,7 +126,7 @@ impl UniswapConfig {
             10,
             TokenMetadata {
                 symbol: "WETH".to_string(),
-                name: "Wrapped Ether".to_string(),
+                name: "WETH9".to_string(),
                 erc_standard: ErcStandard::Erc20,
                 contract_address: "0x4200000000000000000000000000000000000006".to_string(),
                 decimals: 18,
@@ -138,7 +138,7 @@ impl UniswapConfig {
             137,
             TokenMetadata {
                 symbol: "WETH".to_string(),
-                name: "Wrapped Ether".to_string(),
+                name: "WETH9".to_string(),
                 erc_standard: ErcStandard::Erc20,
                 contract_address: "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619".to_string(),
                 decimals: 18,
@@ -150,7 +150,7 @@ impl UniswapConfig {
             8453,
             TokenMetadata {
                 symbol: "WETH".to_string(),
-                name: "Wrapped Ether".to_string(),
+                name: "WETH9".to_string(),
                 erc_standard: ErcStandard::Erc20,
                 contract_address: "0x4200000000000000000000000000000000000006".to_string(),
                 decimals: 18,
@@ -162,7 +162,7 @@ impl UniswapConfig {
             42161,
             TokenMetadata {
                 symbol: "WETH".to_string(),
-                name: "Wrapped Ether".to_string(),
+                name: "WETH9".to_string(),
                 erc_standard: ErcStandard::Erc20,
                 contract_address: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1".to_string(),
                 decimals: 18,

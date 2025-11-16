@@ -259,31 +259,64 @@ impl UniversalRouterVisualizer {
         chain_id: u64,
         registry: Option<&ContractRegistry>,
     ) -> SignablePayloadField {
-        // Try to decode the parameters
-        let params = match V3SwapExactInputParams::abi_decode(bytes) {
-            Ok(p) => p,
-            Err(_) => {
-                // Failed to decode - show truncated hex for readability
-                let input_hex = hex::encode(bytes);
-                let truncated = if input_hex.len() > 32 {
-                    format!("0x{}...{} ({} bytes)", &input_hex[..16], &input_hex[input_hex.len()-8..], bytes.len())
-                } else {
-                    format!("0x{}", input_hex)
-                };
-                return SignablePayloadField::TextV2 {
-                    common: SignablePayloadFieldCommon {
-                        fallback_text: format!("V3SwapExactIn input: {}", truncated),
-                        label: "V3SwapExactIn".to_string(),
-                    },
-                    text_v2: SignablePayloadFieldTextV2 {
-                        text: format!("Unable to decode parameters: {}", truncated),
-                    },
-                };
-            }
-        };
+        // Manual ABI decoding since Alloy's sol! macro has issues with this struct
+        // Expected structure: (address recipient, uint256 amountIn, uint256 amountOutMin, bytes path, bool payerIsUser)
+        if bytes.len() < 160 {
+            let input_hex = hex::encode(bytes);
+            let truncated = if input_hex.len() > 32 {
+                format!("0x{}...{} ({} bytes)", &input_hex[..16], &input_hex[input_hex.len()-8..], bytes.len())
+            } else {
+                format!("0x{}", input_hex)
+            };
+            return SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: format!("V3SwapExactIn input: {}", truncated),
+                    label: "V3SwapExactIn".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: format!("Unable to decode parameters: {}", truncated),
+                },
+            };
+        }
 
-        // Parse the path (at least 43 bytes for single hop: 20 + 3 + 20)
-        let path = &params.path;
+        // Parse fixed fields
+        let amount_in = alloy_primitives::U256::from_be_slice(&bytes[32..64]);
+        let amount_out_min = alloy_primitives::U256::from_be_slice(&bytes[64..96]);
+        let path_offset = u32::from_be_bytes([bytes[124], bytes[125], bytes[126], bytes[127]]) as usize;
+
+        // Parse dynamic bytes (path)
+        if bytes.len() < path_offset + 32 {
+            return SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: "V3SwapExactIn: Invalid path offset".to_string(),
+                    label: "V3SwapExactIn".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: "Path data missing".to_string(),
+                },
+            };
+        }
+
+        let path_len = u32::from_be_bytes([
+            bytes[path_offset + 28],
+            bytes[path_offset + 29],
+            bytes[path_offset + 30],
+            bytes[path_offset + 31]
+        ]) as usize;
+
+        if bytes.len() < path_offset + 32 + path_len {
+            return SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: "V3SwapExactIn: Invalid path length".to_string(),
+                    label: "V3SwapExactIn".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: format!("Expected {} bytes, got {}", path_offset + 32 + path_len, bytes.len()),
+                },
+            };
+        }
+
+        let path = &bytes[path_offset + 32..path_offset + 32 + path_len];
         if path.len() < 43 {
             return SignablePayloadField::TextV2 {
                 common: SignablePayloadFieldCommon {
@@ -311,16 +344,16 @@ impl UniversalRouterVisualizer {
             .unwrap_or_else(|| format!("{:?}", token_out));
 
         // Format amounts
-        let amount_in_u128: u128 = params.amountIn.to_string().parse().unwrap_or(0);
-        let amount_out_min_u128: u128 = params.amountOutMinimum.to_string().parse().unwrap_or(0);
+        let amount_in_u128: u128 = amount_in.to_string().parse().unwrap_or(0);
+        let amount_out_min_u128: u128 = amount_out_min.to_string().parse().unwrap_or(0);
 
         let (amount_in_str, _) = registry
             .and_then(|r| r.format_token_amount(chain_id, token_in, amount_in_u128))
-            .unwrap_or_else(|| (params.amountIn.to_string(), token_in_symbol.clone()));
+            .unwrap_or_else(|| (amount_in.to_string(), token_in_symbol.clone()));
 
         let (amount_out_min_str, _) = registry
             .and_then(|r| r.format_token_amount(chain_id, token_out, amount_out_min_u128))
-            .unwrap_or_else(|| (params.amountOutMinimum.to_string(), token_out_symbol.clone()));
+            .unwrap_or_else(|| (amount_out_min.to_string(), token_out_symbol.clone()));
 
         // Calculate fee percentage
         let fee_pct = fee as f64 / 10000.0;
@@ -732,30 +765,6 @@ mod tests {
                 },
             }
         );
-    }
-
-    #[test]
-    fn test_v3_swap_exact_in_decode_debug() {
-        // Test decoding the first V3SwapExactIn command from the real transaction
-        let input_hex = "000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000d02ab486cedc00000000000000000000000000000000000000000000000000000000cb274a57755e600000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002be71bdfe1df69284f00ee185cf0d95d0c7680c0d4000bb8c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000";
-        let input = hex::decode(input_hex).unwrap();
-
-        println!("Input bytes length: {}", input.len());
-        println!("Input hex: {}", hex::encode(&input));
-
-        match V3SwapExactInputParams::abi_decode(&input) {
-            Ok(params) => {
-                println!("Successfully decoded!");
-                println!("  recipient: {:?}", params.recipient);
-                println!("  amountIn: {}", params.amountIn);
-                println!("  amountOutMinimum: {}", params.amountOutMinimum);
-                println!("  path length: {}", params.path.len());
-                println!("  payerIsUser: {}", params.payerIsUser);
-            }
-            Err(e) => {
-                println!("Failed to decode: {:?}", e);
-            }
-        }
     }
 
     #[test]
