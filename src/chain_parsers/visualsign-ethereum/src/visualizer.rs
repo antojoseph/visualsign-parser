@@ -50,6 +50,9 @@ impl EthereumVisualizerRegistry {
     }
 }
 
+// Implement VisualizerRegistry trait for EthereumVisualizerRegistry
+impl crate::context::VisualizerRegistry for EthereumVisualizerRegistry {}
+
 /// Builder for creating a new EthereumVisualizerRegistry (Mutable)
 ///
 /// This builder is used during the setup phase to register visualizers.

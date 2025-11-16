@@ -104,6 +104,22 @@ impl UniswapConfig {
     // pub fn v4_pool_manager_address() -> Address { ... }
     // pub fn v4_pool_manager_chains() -> &'static [u64] { ... }
 
+    /// Returns the WETH address for a given chain
+    ///
+    /// WETH (Wrapped ETH) addresses vary by chain. This method returns the canonical
+    /// WETH address for supported chains.
+    pub fn weth_address(chain_id: u64) -> Option<Address> {
+        let addr_str = match chain_id {
+            1 => "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", // Ethereum Mainnet
+            10 => "0x4200000000000000000000000000000000000006", // Optimism
+            137 => "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619", // Polygon
+            8453 => "0x4200000000000000000000000000000000000006", // Base
+            42161 => "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // Arbitrum
+            _ => return None,
+        };
+        addr_str.parse().ok()
+    }
+
     /// Registers common tokens used in Uniswap transactions
     ///
     /// This registers tokens like WETH across multiple chains so they can be

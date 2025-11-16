@@ -10,7 +10,10 @@ use crate::registry::ContractRegistry;
 use crate::visualizer::EthereumVisualizerRegistryBuilder;
 
 pub use config::UniswapConfig;
-pub use contracts::{Permit2Visualizer, UniversalRouterVisualizer, V4PoolManagerVisualizer};
+pub use contracts::{
+    Permit2Visualizer, UniversalRouterContractVisualizer, UniversalRouterVisualizer,
+    V4PoolManagerVisualizer,
+};
 
 /// Registers all Uniswap protocol contracts and visualizers
 ///
@@ -23,7 +26,7 @@ pub use contracts::{Permit2Visualizer, UniversalRouterVisualizer, V4PoolManagerV
 /// * `visualizer_reg` - The visualizer registry to register visualizers
 pub fn register(
     contract_reg: &mut ContractRegistry,
-    _visualizer_reg: &mut EthereumVisualizerRegistryBuilder,
+    visualizer_reg: &mut EthereumVisualizerRegistryBuilder,
 ) {
     use config::UniswapUniversalRouter;
 
@@ -40,9 +43,8 @@ pub fn register(
     // Register common tokens (WETH, USDC, USDT, DAI, etc.)
     UniswapConfig::register_common_tokens(contract_reg);
 
-    // TODO: Register visualizers once we implement ContractVisualizer for UniswapV4Visualizer
-    // For now, we just register the contract addresses
-    // Future: visualizer_reg.register(Box::new(UniswapUniversalRouterVisualizer::new()));
+    // Register Universal Router visualizer
+    visualizer_reg.register(Box::new(UniversalRouterContractVisualizer::new()));
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use crate::fmt::{format_ether, format_gwei};
+use crate::registry::ContractType;
 use alloy_consensus::{Transaction as _, TxType, TypedTransaction};
 use alloy_rlp::{Buf, Decodable};
 use base64::{Engine as _, engine::general_purpose::STANDARD as b64};
@@ -19,6 +20,7 @@ pub mod fmt;
 pub mod protocols;
 pub mod registry;
 pub mod token_metadata;
+pub mod utils;
 pub mod visualizer;
 
 #[derive(Debug, Eq, PartialEq, thiserror::Error)]
@@ -164,18 +166,37 @@ impl EthereumTransactionWrapper {
 /// 5. Update all protocol visualizers to use context-based registry
 pub struct EthereumVisualSignConverter {
     registry: registry::ContractRegistry,
+    visualizer_registry: visualizer::EthereumVisualizerRegistry,
 }
 
 impl EthereumVisualSignConverter {
-    /// Creates a new converter with a custom registry
+    /// Creates a new converter with custom registries
+    pub fn with_registries(
+        registry: registry::ContractRegistry,
+        visualizer_registry: visualizer::EthereumVisualizerRegistry,
+    ) -> Self {
+        Self {
+            registry,
+            visualizer_registry,
+        }
+    }
+
+    /// Creates a new converter with a custom contract registry and default visualizer registry
     pub fn with_registry(registry: registry::ContractRegistry) -> Self {
-        Self { registry }
+        Self {
+            registry,
+            visualizer_registry: visualizer::EthereumVisualizerRegistryBuilder::with_default_protocols()
+                .build(),
+        }
     }
 
     /// Creates a new converter with a default registry including all known protocols
     pub fn new() -> Self {
+        let visualizer_registry =
+            visualizer::EthereumVisualizerRegistryBuilder::with_default_protocols().build();
         Self {
             registry: registry::ContractRegistry::with_default_protocols(),
+            visualizer_registry,
         }
     }
 }
@@ -208,7 +229,12 @@ impl VisualSignConverter<EthereumTransactionWrapper> for EthereumVisualSignConve
             TxType::Legacy | TxType::Eip1559 => true,
         };
         if is_supported {
-            return Ok(convert_to_visual_sign_payload(transaction, options, &self.registry));
+            return Ok(convert_to_visual_sign_payload(
+                transaction,
+                options,
+                &self.registry,
+                &self.visualizer_registry,
+            ));
         }
         Err(VisualSignError::DecodeError(format!(
             "Unsupported transaction type: {}",
@@ -294,6 +320,7 @@ fn convert_to_visual_sign_payload(
     transaction: TypedTransaction,
     options: VisualSignOptions,
     registry: &registry::ContractRegistry,
+    visualizer_registry: &visualizer::EthereumVisualizerRegistry,
 ) -> SignablePayload {
     // Extract chain ID to determine the network
     let chain_id = transaction.chain_id();
@@ -376,21 +403,37 @@ fn convert_to_visual_sign_payload(
     let input = transaction.input();
     if !input.is_empty() {
         let mut input_fields: Vec<SignablePayloadField> = Vec::new();
-        if options.decode_transfers {
+
+        // Try to visualize using the registered visualizers
+        let chain_id_val = chain_id.unwrap_or(1);
+        if let Some(to_address) = transaction.to() {
+            if let Some(contract_type) = registry.get_contract_type(chain_id_val, to_address) {
+                if visualizer_registry.get(&contract_type).is_some() {
+                    // Check if this is a Universal Router contract and visualize it
+                    if contract_type == crate::protocols::uniswap::config::UniswapUniversalRouter::short_type_id() {
+                        if let Some(field) = (protocols::uniswap::UniversalRouterVisualizer {})
+                            .visualize_tx_commands(input, chain_id_val, Some(registry))
+                        {
+                            input_fields.push(field);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: Try ERC20 if decode_transfers is enabled
+        if input_fields.is_empty() && options.decode_transfers {
             if let Some(field) = (contracts::core::ERC20Visualizer {}).visualize_tx_commands(input)
             {
                 input_fields.push(field);
             }
         }
-        if let Some(field) = (protocols::uniswap::UniversalRouterVisualizer {})
-            .visualize_tx_commands(input, chain_id.unwrap_or(1), Some(registry))
-        {
-            input_fields.push(field);
-        }
+
+        // Last resort: Use fallback visualizer for unknown contract calls
         if input_fields.is_empty() {
-            // Use fallback visualizer for unknown contract calls
             input_fields.push(contracts::core::FallbackVisualizer::new().visualize_hex(input));
         }
+
         fields.append(&mut input_fields);
     }
 
