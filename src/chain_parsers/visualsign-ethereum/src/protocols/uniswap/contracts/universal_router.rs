@@ -376,46 +376,83 @@ impl UniversalRouterVisualizer {
     }
 
     /// Decodes V3_SWAP_EXACT_IN command parameters
+    /// Manual ABI decoding since the raw calldata bytes cannot be decoded with sol! macro
     fn decode_v3_swap_exact_in(
         bytes: &[u8],
         chain_id: u64,
         registry: Option<&ContractRegistry>,
     ) -> SignablePayloadField {
-        // Use sol! macro for clean decoding
-        let params = match V3SwapExactInputParams::abi_decode(bytes) {
-            Ok(p) => p,
-            Err(_) => {
-                return SignablePayloadField::TextV2 {
-                    common: SignablePayloadFieldCommon {
-                        fallback_text: format!("V3 Swap Exact In: 0x{}", hex::encode(bytes)),
-                        label: "V3 Swap Exact In".to_string(),
-                    },
-                    text_v2: SignablePayloadFieldTextV2 {
-                        text: "Failed to decode parameters".to_string(),
-                    },
-                };
-            }
-        };
-
-        // Parse the path to extract token addresses and fee
-        if params.path.0.len() < 43 {
+        // Expected structure: (address recipient, uint256 amountIn, uint256 amountOutMin, bytes path, bool payerIsUser)
+        // In ABI encoding: [0-32) recipient, [32-64) amountIn, [64-96) amountOutMin, [96-128) path offset, [128-160) payerIsUser
+        if bytes.len() < 160 {
             return SignablePayloadField::TextV2 {
                 common: SignablePayloadFieldCommon {
-                    fallback_text: "V3SwapExactIn: Invalid path".to_string(),
+                    fallback_text: format!("V3 Swap Exact In: 0x{}", hex::encode(bytes)),
                     label: "V3 Swap Exact In".to_string(),
                 },
                 text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("Path length: {} bytes (expected ≥43)", params.path.0.len()),
+                    text: "Failed to decode parameters".to_string(),
                 },
             };
         }
 
-        let path_bytes = &params.path.0;
-        let token_in = Address::from_slice(&path_bytes[0..20]);
-        let fee = u32::from_be_bytes([0, path_bytes[20], path_bytes[21], path_bytes[22]]);
-        let token_out = Address::from_slice(&path_bytes[23..43]);
+        // Parse fixed fields
+        let amount_in = alloy_primitives::U256::from_be_slice(&bytes[32..64]);
+        let amount_out_min = alloy_primitives::U256::from_be_slice(&bytes[64..96]);
+        let path_offset = u32::from_be_bytes([bytes[124], bytes[125], bytes[126], bytes[127]]) as usize;
 
-        // Resolve token symbols and format amounts
+        // Parse dynamic bytes (path)
+        if bytes.len() < path_offset + 32 {
+            return SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: "V3SwapExactIn: Invalid path offset".to_string(),
+                    label: "V3 Swap Exact In".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: "Path data missing".to_string(),
+                },
+            };
+        }
+
+        let path_len = u32::from_be_bytes([
+            bytes[path_offset + 28],
+            bytes[path_offset + 29],
+            bytes[path_offset + 30],
+            bytes[path_offset + 31]
+        ]) as usize;
+
+        if bytes.len() < path_offset + 32 + path_len {
+            return SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: "V3SwapExactIn: Invalid path length".to_string(),
+                    label: "V3 Swap Exact In".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: format!("Expected {} bytes, got {}", path_offset + 32 + path_len, bytes.len()),
+                },
+            };
+        }
+
+        let path = &bytes[path_offset + 32..path_offset + 32 + path_len];
+        if path.len() < 43 {
+            return SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: "V3SwapExactIn: Invalid path length".to_string(),
+                    label: "V3 Swap Exact In".to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: format!("Path length: {} bytes (expected >=43)", path.len()),
+                },
+            };
+        }
+
+        // Extract token addresses and fee
+        let token_in = Address::from_slice(&path[0..20]);
+        let fee_bytes = [0, path[20], path[21], path[22]];
+        let fee = u32::from_be_bytes(fee_bytes);
+        let token_out = Address::from_slice(&path[23..43]);
+
+        // Resolve token symbols
         let token_in_symbol = registry
             .and_then(|r| r.get_token_symbol(chain_id, token_in))
             .unwrap_or_else(|| format!("{:?}", token_in));
@@ -423,17 +460,19 @@ impl UniversalRouterVisualizer {
             .and_then(|r| r.get_token_symbol(chain_id, token_out))
             .unwrap_or_else(|| format!("{:?}", token_out));
 
-        let amount_in_u128: u128 = params.amountIn.to_string().parse().unwrap_or(0);
-        let amount_out_min_u128: u128 = params.amountOutMinimum.to_string().parse().unwrap_or(0);
+        // Format amounts
+        let amount_in_u128: u128 = amount_in.to_string().parse().unwrap_or(0);
+        let amount_out_min_u128: u128 = amount_out_min.to_string().parse().unwrap_or(0);
 
         let (amount_in_str, _) = registry
             .and_then(|r| r.format_token_amount(chain_id, token_in, amount_in_u128))
-            .unwrap_or_else(|| (params.amountIn.to_string(), token_in_symbol.clone()));
+            .unwrap_or_else(|| (amount_in.to_string(), token_in_symbol.clone()));
 
         let (amount_out_min_str, _) = registry
             .and_then(|r| r.format_token_amount(chain_id, token_out, amount_out_min_u128))
-            .unwrap_or_else(|| (params.amountOutMinimum.to_string(), token_out_symbol.clone()));
+            .unwrap_or_else(|| (amount_out_min.to_string(), token_out_symbol.clone()));
 
+        // Calculate fee percentage
         let fee_pct = fee as f64 / 10000.0;
         let text = format!(
             "Swap {} {} for >={} {} via V3 ({}% fee)",
