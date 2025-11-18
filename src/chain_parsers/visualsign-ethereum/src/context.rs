@@ -118,8 +118,7 @@ mod tests {
             registry: registry.clone(),
             visualizers: visualizers.clone(),
         };
-        let context =
-            VisualizerContext::new(params);
+        let context = VisualizerContext::new(params);
 
         assert_eq!(context.chain_id, 1);
         assert_eq!(context.call_depth, 0);
@@ -149,8 +148,7 @@ mod tests {
             registry: registry.clone(),
             visualizers: visualizers.clone(),
         };
-        let context =
-            VisualizerContext::new(params);
+        let context = VisualizerContext::new(params);
 
         let cloned = context.clone();
 
