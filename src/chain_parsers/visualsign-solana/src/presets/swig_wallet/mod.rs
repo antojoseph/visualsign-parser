@@ -39,6 +39,8 @@ impl InstructionVisualizer for SwigWalletVisualizer {
             .current_instruction()
             .ok_or_else(|| VisualSignError::MissingData("No instruction found".into()))?;
 
+        // Convert 0-based index to 1-based instruction number for user-facing labels
+        // (e.g., "Instruction 1" instead of "Instruction 0")
         let instruction_number = context.instruction_index() + 1;
         let decoded = parse_swig_instruction(&instruction.data, &instruction.accounts)
             .map_err(|err| VisualSignError::DecodeError(err.to_string()))?;
