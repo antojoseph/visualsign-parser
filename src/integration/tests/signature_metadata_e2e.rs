@@ -1,3 +1,4 @@
+use ed25519_dalek::{SigningKey as Ed25519SigningKey, VerifyingKey as Ed25519VerifyingKey};
 /// End-to-end test for SignatureMetadata with cryptographic signature verification
 ///
 /// This test validates that:
@@ -8,9 +9,11 @@ use generated::parser::{
     Abi, Chain, ChainMetadata, EthereumMetadata, Idl, Metadata, ParseRequest, SignatureMetadata,
     SolanaIdlType, SolanaMetadata, chain_metadata,
 };
+use k256::EncodedPoint;
 use k256::ecdsa::SigningKey;
 use k256::ecdsa::VerifyingKey;
 use k256::ecdsa::signature::Signer;
+use k256::ecdsa::signature::Verifier;
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 
@@ -20,7 +23,7 @@ fn hash_content_sha256(content: &str) -> [u8; 32] {
     hasher.update(content.as_bytes());
     let result = hasher.finalize();
     let mut output = [0u8; 32];
-    output.copy_from_slice(&result);
+    output.copy_from_slice(result.as_ref());
     output
 }
 
@@ -42,21 +45,18 @@ fn sign_with_secp256k1(content: &str) -> (String, String) {
 }
 
 /// Sign content with ed25519 (Solana-style) - for testing only
-/// In production, use proper ed25519 library
+/// Uses a well-known test seed for deterministic signatures
 fn sign_with_ed25519(content: &str) -> (String, String) {
-    let mut seed = [0u8; 32];
-    rand::rng().fill_bytes(&mut seed);
+    // Use a deterministic test seed (all 0x11s) for reproducibility
+    let seed = [0x11u8; 32];
+    let signing_key = Ed25519SigningKey::from_bytes(&seed);
+    let verifying_key = Ed25519VerifyingKey::from(&signing_key);
 
     let message_hash = hash_content_sha256(content);
+    let signature = signing_key.sign(&message_hash);
 
-    // For testing, we'll use deterministic signatures based on the content hash
-    // In a real implementation, use ed25519_dalek or equivalent
-    let mut signature_bytes = [0u8; 64];
-    signature_bytes[0..32].copy_from_slice(&seed);
-    signature_bytes[32..64].copy_from_slice(&message_hash);
-
-    let signature_hex = hex::encode(signature_bytes);
-    let public_key_hex = hex::encode(seed);
+    let signature_hex = hex::encode(signature.to_bytes());
+    let public_key_hex = hex::encode(verifying_key.as_bytes());
 
     (signature_hex, public_key_hex)
 }
@@ -67,9 +67,6 @@ fn verify_secp256k1(
     signature_hex: &str,
     public_key_hex: &str,
 ) -> Result<(), String> {
-    use k256::EncodedPoint;
-    use k256::ecdsa::signature::Verifier;
-
     let signature_bytes =
         hex::decode(signature_hex).map_err(|e| format!("Failed to decode signature: {e}"))?;
     let public_key_bytes =
@@ -91,8 +88,7 @@ fn verify_secp256k1(
     Ok(())
 }
 
-/// Verify ed25519 signature - for testing only
-/// This is a simplified verification that matches our test signing
+/// Verify ed25519 signature
 fn verify_ed25519(content: &str, signature_hex: &str, public_key_hex: &str) -> Result<(), String> {
     let signature_bytes =
         hex::decode(signature_hex).map_err(|e| format!("Failed to decode signature: {e}"))?;
@@ -114,13 +110,26 @@ fn verify_ed25519(content: &str, signature_hex: &str, public_key_hex: &str) -> R
 
     let message_hash = hash_content_sha256(content);
 
-    // For our test signing, the second half of the signature is the message hash
-    // So we can verify by checking if they match
-    if signature_bytes[32..64] == message_hash {
-        Ok(())
-    } else {
-        Err("Signature verification failed".to_string())
-    }
+    let verifying_key = Ed25519VerifyingKey::from_bytes(
+        public_key_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| "Failed to parse public key".to_string())?,
+    )
+    .map_err(|e| format!("Failed to create verifying key: {e}"))?;
+
+    let signature = ed25519_dalek::Signature::from_bytes(
+        signature_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| "Failed to parse signature".to_string())?,
+    );
+
+    verifying_key
+        .verify(&message_hash, &signature)
+        .map_err(|e| format!("Signature verification failed: {e}"))?;
+
+    Ok(())
 }
 
 fn verify_signature_metadata(
