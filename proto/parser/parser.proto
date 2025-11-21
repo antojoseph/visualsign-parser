@@ -48,9 +48,13 @@ message QOSParserResponse {
 message ParseRequest {
   string unsigned_payload = 1;
   Chain chain = 2;
-  oneof chainMetadata {
-    EthereumMetadata ethereum = 3;
-    SolanaMetadata solana = 4;
+  ChainMetadata chain_metadata = 3;
+}
+
+message ChainMetadata {
+  oneof metadata {
+    EthereumMetadata ethereum = 1;
+    SolanaMetadata solana = 2;
   }
 }
 
@@ -61,6 +65,11 @@ message ParseResponse {
 message Metadata {
   string key = 1;
   string value = 2;
+}
+
+message SignatureMetadata {
+  string value = 1;                    // Signature of content hash (computed over parent content using algorithm specified in metadata)
+  repeated Metadata metadata = 2;      // Generic metadata about the signature (e.g., algorithm, issuer, timestamp as key-value pairs)
 }
 
 message ParsedTransactionPayload {
@@ -86,6 +95,26 @@ message Signature {
 }
 
 message EthereumMetadata {
+  optional Abi abi = 1;
 }
+
 message SolanaMetadata {
+  optional Idl idl = 1;
+}
+
+message Abi {
+  string value = 1;                         // JSON ABI definition
+  optional SignatureMetadata signature = 2; // Optional ABI signature with metadata
+}
+
+message Idl {
+  string value = 1;                         // JSON IDL (Interface Definition Language) definition
+  optional SolanaIdlType idl_type = 2;      // Type of Solana IDL (e.g., Anchor)
+  optional string idl_version = 3;          // IDL version (e.g., "0.30.0")
+  optional SignatureMetadata signature = 4; // Optional IDL signature with metadata
+}
+
+enum SolanaIdlType {
+  SOLANA_IDL_TYPE_UNSPECIFIED = 0;
+  SOLANA_IDL_TYPE_ANCHOR = 1;
 }
