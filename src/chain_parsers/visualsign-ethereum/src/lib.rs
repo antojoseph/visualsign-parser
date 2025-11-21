@@ -20,6 +20,7 @@ pub mod context;
 pub mod contracts;
 pub mod embedded_abis;
 pub mod fmt;
+pub mod grpc_abi;
 pub mod protocols;
 pub mod registry;
 pub mod token_metadata;
