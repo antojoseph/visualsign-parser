@@ -1,0 +1,39 @@
+[package]
+name = "visualsign-api"
+version = "0.1.0"
+edition = "2021"
+authors = ["EigenLayer Parser Contributors"]
+description = "REST API for EigenLayer transaction parsing with VisualSign"
+
+[dependencies]
+# Core parsing
+visualsign = { path = "../src/visualsign" }
+visualsign-ethereum = { path = "../src/chain_parsers/visualsign-ethereum" }
+
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1.43", features = ["full"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+hex = "0.4"
+
+[dev-dependencies]
+reqwest = { version = "0.11", features = ["json"] }
+
+[[bin]]
+name = "visualsign-api"
+path = "src/main.rs"

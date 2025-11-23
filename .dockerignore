@@ -1,2 +1,39 @@
-**/target
-out
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts
+target/
+api-server/target/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# CI/CD
+.github/
+
+# Temporary files
+tmp/
+*.tmp
+*.log
+
+# macOS
+.DS_Store
+
+# Test files
+tests/
+test_fixtures/
