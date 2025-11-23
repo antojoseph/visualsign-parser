@@ -1612,56 +1612,45 @@ impl EigenLayerVisualizer {
     fn visualize_create_avs_rewards_submission(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinator::createAVSRewardsSubmissionCall::abi_decode(input).ok()?;
 
-        let mut details = Vec::new();
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_text_field(
+                "Submissions",
+                &format!("{} submission{}", call.rewardsSubmissions.len(), if call.rewardsSubmissions.len() == 1 { "" } else { "s" }),
+                None,
+            ),
+        ];
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.rewardsSubmissions.len().to_string(),
-                    label: "Number of Submissions".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.rewardsSubmissions.len().to_string(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_text_field(
+                "Total Submissions",
+                &call.rewardsSubmissions.len().to_string(),
+                Some("Number of reward submissions being created for AVS operators"),
+            ),
+        ];
 
         // Display each reward submission
         for (i, submission) in call.rewardsSubmissions.iter().enumerate() {
-            details.push(AnnotatedPayloadField {
-                signable_payload_field: SignablePayloadField::AddressV2 {
-                    common: SignablePayloadFieldCommon {
-                        fallback_text: format!("{:?}", submission.token),
-                        label: format!("Reward {} Token", i + 1),
-                    },
-                    address_v2: SignablePayloadFieldAddressV2 {
-                        address: format!("{:?}", submission.token),
-                        name: "Reward Token".to_string(),
-                        asset_label: "".to_string(),
-                        memo: None,
-                        badge_text: None,
-                    },
-                },
-                static_annotation: None,
-                dynamic_annotation: None,
-            });
+            expanded_fields.push(Self::create_divider());
 
-            details.push(AnnotatedPayloadField {
-                signable_payload_field: SignablePayloadField::AmountV2 {
-                    common: SignablePayloadFieldCommon {
-                        fallback_text: submission.amount.to_string(),
-                        label: format!("Reward {} Amount", i + 1),
-                    },
-                    amount_v2: SignablePayloadFieldAmountV2 {
-                        amount: submission.amount.to_string(),
-                        abbreviation: None,
-                    },
-                },
-                static_annotation: None,
-                dynamic_annotation: None,
-            });
+            let token_addr = format!("{:?}", submission.token);
+            expanded_fields.push(Self::create_address_field(
+                &format!("Reward {} Token", i + 1),
+                &token_addr,
+                None,
+                None,
+                None,
+                None,
+            ));
+
+            expanded_fields.push(Self::create_amount_field(
+                &format!("Reward {} Amount", i + 1),
+                submission.amount,
+                None,
+                None,
+                None,
+            ));
         }
 
         Some(SignablePayloadField::PreviewLayout {
@@ -1679,8 +1668,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: format!("{} reward submission(s)", call.rewardsSubmissions.len()),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -2307,39 +2296,44 @@ impl EigenLayerVisualizer {
     fn visualize_create_operator_sets(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IAllocationManager::createOperatorSetsCall::abi_decode(input).ok()?;
 
-        let mut details = Vec::new();
+        let avs_addr = format!("{:?}", call.avs);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.avs),
-                    label: "AVS".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.avs),
-                    name: "AVS Address".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("AVS".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+            Self::create_number_field(
+                "Count",
+                &call.params.len().to_string(),
+                None,
+            ),
+        ];
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.params.len().to_string(),
-                    label: "Number of Operator Sets".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.params.len().to_string(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_number_field(
+            "Operator Sets to Create",
+            &call.params.len().to_string(),
+            Some("Number of new operator sets being initialized for this AVS"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -2353,8 +2347,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: format!("{} operator set(s)", call.params.len()),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -2362,67 +2356,64 @@ impl EigenLayerVisualizer {
     fn visualize_slash_operator(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IAllocationManager::slashOperatorCall::abi_decode(input).ok()?;
 
-        let mut details = Vec::new();
+        let avs_addr = format!("{:?}", call.avs);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.avs),
-                    label: "AVS".to_string(),
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+            Self::create_text_field(
+                "Reason",
+                &if call.params.description.len() > 30 {
+                    format!("{}...", &call.params.description[..27])
+                } else {
+                    call.params.description.clone()
                 },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.avs),
-                    name: "AVS Address".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("AVS".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+                None,
+            ),
+        ];
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.params.operatorSetId.to_string(),
-                    label: "Operator Set ID".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.params.operatorSetId.to_string(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+        ];
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.params.strategies.len().to_string(),
-                    label: "Number of Strategies".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.params.strategies.len().to_string(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        expanded_fields.push(Self::create_divider());
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.params.description.clone(),
-                    label: "Description".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.params.description.clone(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        expanded_fields.push(Self::create_number_field(
+            "Operator Set ID",
+            &call.params.operatorSetId.to_string(),
+            None,
+        ));
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_number_field(
+            "Strategies Affected",
+            &call.params.strategies.len().to_string(),
+            None,
+        ));
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_text_field(
+            "Slashing Reason",
+            &call.params.description,
+            Some("WARNING: Slashing is irreversible and will penalize the operator's stake"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -2436,8 +2427,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: format!("Operator Set {}", call.params.operatorSetId),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -2445,39 +2436,44 @@ impl EigenLayerVisualizer {
     fn visualize_clear_deallocation_queue(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IAllocationManager::clearDeallocationQueueCall::abi_decode(input).ok()?;
 
-        let mut details = Vec::new();
+        let operator_addr = format!("{:?}", call.operator);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.operator),
-                    label: "Operator".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.operator),
-                    name: "Operator Address".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("Operator".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "Operator",
+                &operator_addr,
+                None,
+                None,
+                None,
+                Some("Operator"),
+            ),
+            Self::create_number_field(
+                "Strategies",
+                &call.strategies.len().to_string(),
+                None,
+            ),
+        ];
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.strategies.len().to_string(),
-                    label: "Number of Strategies".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.strategies.len().to_string(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "Operator",
+                &operator_addr,
+                None,
+                None,
+                None,
+                Some("Operator"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_number_field(
+            "Strategies to Clear",
+            &call.strategies.len().to_string(),
+            Some("Number of strategies being removed from the deallocation queue"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -2494,8 +2490,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: format!("{} strategies", call.strategies.len()),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -3560,39 +3556,45 @@ impl EigenLayerVisualizer {
     // RewardsCoordinator - Additional visualizers
     fn visualize_create_operator_directed_avs_rewards(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::createOperatorDirectedAVSRewardsSubmissionCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.avs),
-                    label: "AVS".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.avs),
-                    name: "AVS".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("AVS".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let avs_addr = format!("{:?}", call.avs);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} submissions", call.rewardsSubmissions.len()),
-                    label: "Number of Submissions".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{} submissions", call.rewardsSubmissions.len()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+            Self::create_text_field(
+                "Submissions",
+                &format!("{} submission{}", call.rewardsSubmissions.len(), if call.rewardsSubmissions.len() == 1 { "" } else { "s" }),
+                None,
+            ),
+        ];
+
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_text_field(
+            "Total Submissions",
+            &call.rewardsSubmissions.len().to_string(),
+            Some("Number of reward submissions being created for operators"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3606,47 +3608,53 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Submit rewards for AVS operators".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_create_operator_directed_operator_set_rewards(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::createOperatorDirectedOperatorSetRewardsSubmissionCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.avs),
-                    label: "AVS".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.avs),
-                    name: "AVS".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("AVS".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let avs_addr = format!("{:?}", call.avs);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.operatorSetId),
-                    label: "Operator Set ID".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}", call.operatorSetId),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+            Self::create_number_field(
+                "Operator Set",
+                &call.operatorSetId.to_string(),
+                None,
+            ),
+        ];
+
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_number_field(
+            "Operator Set ID",
+            &call.operatorSetId.to_string(),
+            Some("The operator set receiving rewards"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3660,29 +3668,32 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Submit rewards for operator set".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_disable_root(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::disableRootCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.rootIndex),
-                    label: "Root Index".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}", call.rootIndex),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_number_field(
+                "Root Index",
+                &call.rootIndex.to_string(),
+                None,
+            ),
+        ];
+
+        // EXPANDED
+        let expanded_fields = vec![
+            Self::create_number_field(
+                "Root Index",
+                &call.rootIndex.to_string(),
+                Some("Invalidating this merkle root prevents further reward claims from it"),
+            ),
+        ];
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3696,29 +3707,34 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Invalidate a rewards merkle root".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_activation_delay(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::setActivationDelayCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} seconds", call._activationDelay),
-                    label: "Activation Delay".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{} seconds", call._activationDelay),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let delay_text = format!("{} seconds", call._activationDelay);
+
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_text_field(
+                "Delay",
+                &delay_text,
+                None,
+            ),
+        ];
+
+        // EXPANDED
+        let expanded_fields = vec![
+            Self::create_text_field(
+                "Activation Delay",
+                &delay_text,
+                Some("Time delay before rewards become active and claimable"),
+            ),
+        ];
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3732,29 +3748,34 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Configure rewards activation timing".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_default_operator_split(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::setDefaultOperatorSplitCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}%", call.split as f64 / 100.0),
-                    label: "Split".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}%", call.split as f64 / 100.0),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let split_percent = format!("{}%", call.split as f64 / 100.0);
+
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_text_field(
+                "Default Split",
+                &split_percent,
+                None,
+            ),
+        ];
+
+        // EXPANDED
+        let expanded_fields = vec![
+            Self::create_text_field(
+                "Default Operator Split",
+                &split_percent,
+                Some("Percentage of rewards that operators receive by default"),
+            ),
+        ];
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3768,65 +3789,67 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Configure default rewards split".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_operator_avs_split(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::setOperatorAVSSplitCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.operator),
-                    label: "Operator".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.operator),
-                    name: "Operator".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("Operator".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let operator_addr = format!("{:?}", call.operator);
+        let avs_addr = format!("{:?}", call.avs);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.avs),
-                    label: "AVS".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.avs),
-                    name: "AVS".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("AVS".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let split_percent = format!("{}%", call.split as f64 / 100.0);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}%", call.split as f64 / 100.0),
-                    label: "Split".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}%", call.split as f64 / 100.0),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "Operator",
+                &operator_addr,
+                None,
+                None,
+                None,
+                Some("Operator"),
+            ),
+            Self::create_text_field(
+                "Split",
+                &split_percent,
+                None,
+            ),
+        ];
+
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "Operator",
+                &operator_addr,
+                None,
+                None,
+                None,
+                Some("Operator"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_address_field(
+            "AVS",
+            &avs_addr,
+            None,
+            None,
+            None,
+            Some("AVS"),
+        ));
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_text_field(
+            "Rewards Split",
+            &split_percent,
+            Some("Percentage of rewards the operator receives from this AVS"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3840,47 +3863,55 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Configure operator-AVS rewards split".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_operator_pi_split(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::setOperatorPISplitCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.operator),
-                    label: "Operator".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.operator),
-                    name: "Operator".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("Operator".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let operator_addr = format!("{:?}", call.operator);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}%", call.split as f64 / 100.0),
-                    label: "Split".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}%", call.split as f64 / 100.0),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let split_percent = format!("{}%", call.split as f64 / 100.0);
+
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "Operator",
+                &operator_addr,
+                None,
+                None,
+                None,
+                Some("Operator"),
+            ),
+            Self::create_text_field(
+                "PI Split",
+                &split_percent,
+                None,
+            ),
+        ];
+
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "Operator",
+                &operator_addr,
+                None,
+                None,
+                None,
+                Some("Operator"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_text_field(
+            "Programmatic Incentives Split",
+            &split_percent,
+            Some("Percentage of programmatic incentive rewards the operator receives"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3894,61 +3925,62 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Configure programmatic incentives split".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_operator_set_split(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::setOperatorSetSplitCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.avs),
-                    label: "AVS".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.avs),
-                    name: "AVS".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("AVS".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let avs_addr = format!("{:?}", call.avs);
+        let split_percent = format!("{}%", call.split as f64 / 100.0);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.operatorSetId),
-                    label: "Operator Set ID".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}", call.operatorSetId),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+            Self::create_text_field(
+                "Split",
+                &split_percent,
+                None,
+            ),
+        ];
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}%", call.split as f64 / 100.0),
-                    label: "Split".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}%", call.split as f64 / 100.0),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_number_field(
+            "Operator Set ID",
+            &call.operatorSetId.to_string(),
+            None,
+        ));
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_text_field(
+            "Rewards Split",
+            &split_percent,
+            Some("Percentage of rewards allocated to this operator set"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3962,47 +3994,55 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Configure operator set rewards split".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_rewards_for_all_submitter(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::setRewardsForAllSubmitterCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call._submitter),
-                    label: "Submitter".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call._submitter),
-                    name: "Rewards Submitter".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let submitter_addr = format!("{:?}", call._submitter);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: if call._newValue { "Enabled".to_string() } else { "Disabled".to_string() },
-                    label: "Status".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: if call._newValue { "Enabled".to_string() } else { "Disabled".to_string() },
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let status = if call._newValue { "Enabled" } else { "Disabled" };
+
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "Submitter",
+                &submitter_addr,
+                None,
+                None,
+                None,
+                Some("Config"),
+            ),
+            Self::create_text_field(
+                "Status",
+                status,
+                None,
+            ),
+        ];
+
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "Submitter Address",
+                &submitter_addr,
+                None,
+                None,
+                None,
+                Some("Config"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_text_field(
+            "New Status",
+            status,
+            Some("Whether this address can submit rewards for all operators"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -4016,33 +4056,40 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Enable/disable rewards submitter".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_rewards_updater(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::setRewardsUpdaterCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call._rewardsUpdater),
-                    label: "Rewards Updater".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call._rewardsUpdater),
-                    name: "Rewards Updater".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let updater_addr = format!("{:?}", call._rewardsUpdater);
+
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "Updater",
+                &updater_addr,
+                None,
+                None,
+                None,
+                Some("Admin"),
+            ),
+        ];
+
+        // EXPANDED
+        let expanded_fields = vec![
+            Self::create_address_field(
+                "New Rewards Updater",
+                &updater_addr,
+                None,
+                None,
+                Some("Address with permission to update reward parameters"),
+                Some("Admin"),
+            ),
+        ];
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -4056,8 +4103,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Change rewards updater address".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -4065,53 +4112,53 @@ impl EigenLayerVisualizer {
     // AllocationManager - Additional visualizers
     fn visualize_add_strategies_to_operator_set(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IAllocationManager::addStrategiesToOperatorSetCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.avs),
-                    label: "AVS".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.avs),
-                    name: "AVS".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("AVS".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let avs_addr = format!("{:?}", call.avs);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.operatorSetId),
-                    label: "Operator Set ID".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}", call.operatorSetId),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+            Self::create_text_field(
+                "Strategies",
+                &format!("{} strateg{}", call.strategies.len(), if call.strategies.len() == 1 { "y" } else { "ies" }),
+                None,
+            ),
+        ];
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} strategies", call.strategies.len()),
-                    label: "Number of Strategies".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{} strategies", call.strategies.len()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_number_field(
+            "Operator Set ID",
+            &call.operatorSetId.to_string(),
+            None,
+        ));
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_text_field(
+            "Strategies Being Added",
+            &call.strategies.len().to_string(),
+            Some("Number of strategies being enabled for this operator set"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -4125,61 +4172,61 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Enable strategies for operator set".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_remove_strategies_from_operator_set(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IAllocationManager::removeStrategiesFromOperatorSetCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.avs),
-                    label: "AVS".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.avs),
-                    name: "AVS".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("AVS".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let avs_addr = format!("{:?}", call.avs);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.operatorSetId),
-                    label: "Operator Set ID".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}", call.operatorSetId),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+            Self::create_text_field(
+                "Strategies",
+                &format!("{} strateg{}", call.strategies.len(), if call.strategies.len() == 1 { "y" } else { "ies" }),
+                None,
+            ),
+        ];
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} strategies", call.strategies.len()),
-                    label: "Number of Strategies".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{} strategies", call.strategies.len()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_number_field(
+            "Operator Set ID",
+            &call.operatorSetId.to_string(),
+            None,
+        ));
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_text_field(
+            "Strategies Being Removed",
+            &call.strategies.len().to_string(),
+            Some("Number of strategies being disabled from this operator set"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -4193,51 +4240,60 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Disable strategies for operator set".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_avs_registrar(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IAllocationManager::setAVSRegistrarCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.avs),
-                    label: "AVS".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.avs),
-                    name: "AVS".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("AVS".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let avs_addr = format!("{:?}", call.avs);
+        let registrar_addr = format!("{:?}", call.registrar);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.registrar),
-                    label: "Registrar".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.registrar),
-                    name: "AVS Registrar".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+            Self::create_address_field(
+                "Registrar",
+                &registrar_addr,
+                None,
+                None,
+                None,
+                Some("Admin"),
+            ),
+        ];
+
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "AVS",
+                &avs_addr,
+                None,
+                None,
+                None,
+                Some("AVS"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_address_field(
+            "New Registrar",
+            &registrar_addr,
+            None,
+            None,
+            Some("Address with permission to manage operator registrations for this AVS"),
+            Some("Admin"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -4251,47 +4307,55 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Change AVS registration manager".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_allocation_delay(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IAllocationManager::setAllocationDelayCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.operator),
-                    label: "Operator".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.operator),
-                    name: "Operator".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("Operator".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let operator_addr = format!("{:?}", call.operator);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} seconds", call.delay),
-                    label: "Delay".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{} seconds", call.delay),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let delay_text = format!("{} seconds", call.delay);
+
+        // CONDENSED
+        let condensed_fields = vec![
+            Self::create_address_field(
+                "Operator",
+                &operator_addr,
+                None,
+                None,
+                None,
+                Some("Operator"),
+            ),
+            Self::create_text_field(
+                "Delay",
+                &delay_text,
+                None,
+            ),
+        ];
+
+        // EXPANDED
+        let mut expanded_fields = vec![
+            Self::create_address_field(
+                "Operator",
+                &operator_addr,
+                None,
+                None,
+                None,
+                Some("Operator"),
+            ),
+        ];
+
+        expanded_fields.push(Self::create_divider());
+
+        expanded_fields.push(Self::create_text_field(
+            "Allocation Delay",
+            &delay_text,
+            Some("Time delay before allocations take effect for this operator"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -4305,8 +4369,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Configure operator allocation delay".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
