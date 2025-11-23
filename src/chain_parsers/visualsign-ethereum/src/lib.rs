@@ -288,6 +288,14 @@ fn convert_to_visual_sign_payload(
     let input = transaction.input();
     if !input.is_empty() {
         let mut input_fields: Vec<SignablePayloadField> = Vec::new();
+
+        // EigenLayer check (prioritized first for restaking operations)
+        if let Some(field) =
+            (contracts::eigenlayer::EigenLayerVisualizer {}).visualize_tx_commands(input)
+        {
+            input_fields.push(field);
+        }
+
         if options.decode_transfers {
             if let Some(field) = (contracts::erc20::ERC20Visualizer {}).visualize_tx_commands(input)
             {
