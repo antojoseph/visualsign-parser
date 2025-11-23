@@ -619,6 +619,29 @@ impl EigenLayerVisualizer {
         }
     }
 
+    // Helper function to create a text field
+    fn create_text_field(
+        label: &str,
+        text: &str,
+        static_annotation: Option<&str>,
+    ) -> AnnotatedPayloadField {
+        AnnotatedPayloadField {
+            signable_payload_field: SignablePayloadField::TextV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: text.to_string(),
+                    label: label.to_string(),
+                },
+                text_v2: SignablePayloadFieldTextV2 {
+                    text: text.to_string(),
+                },
+            },
+            static_annotation: static_annotation.map(|text| SignablePayloadFieldStaticAnnotation {
+                text: text.to_string(),
+            }),
+            dynamic_annotation: None,
+        }
+    }
+
     pub fn visualize_tx_commands(&self, input: &[u8]) -> Option<SignablePayloadField> {
         if input.len() < 4 {
             return None;
@@ -1962,43 +1985,45 @@ impl EigenLayerVisualizer {
     fn visualize_modify_operator_details(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IDelegationManager::modifyOperatorDetailsCall::abi_decode(input).ok()?;
 
-        let mut details = Vec::new();
+        let operator_addr = format!("{:?}", call.operator);
+        let approver_addr = format!("{:?}", call.newDelegationApprover);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.operator),
-                    label: "Operator".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.operator),
-                    name: "Operator Address".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("Operator".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Operator",
+            &operator_addr,
+            Some("Operator"),
+            None,
+            None,
+            Some("Operator"),
+        ));
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.newDelegationApprover),
-                    label: "New Delegation Approver".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.newDelegationApprover),
-                    name: "New Approver".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Operator address
+        expanded_fields.push(Self::create_address_field(
+            "Operator",
+            &operator_addr,
+            Some("Operator"),
+            None,
+            Some("Operator configuration is being updated"),
+            Some("Operator"),
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // New delegation approver
+        expanded_fields.push(Self::create_address_field(
+            "New Delegation Approver",
+            &approver_addr,
+            Some("Delegation Approver"),
+            None,
+            Some("This address will approve future delegations"),
+            None,
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -2012,8 +2037,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Update operator configuration".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -2021,39 +2046,41 @@ impl EigenLayerVisualizer {
     fn visualize_update_operator_metadata(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IDelegationManager::updateOperatorMetadataURICall::abi_decode(input).ok()?;
 
-        let mut details = Vec::new();
+        let operator_addr = format!("{:?}", call.operator);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.operator),
-                    label: "Operator".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.operator),
-                    name: "Operator Address".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("Operator".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Operator",
+            &operator_addr,
+            Some("Operator"),
+            None,
+            None,
+            Some("Operator"),
+        ));
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.metadataURI.clone(),
-                    label: "New Metadata URI".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.metadataURI.clone(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Operator address
+        expanded_fields.push(Self::create_address_field(
+            "Operator",
+            &operator_addr,
+            Some("Operator"),
+            None,
+            None,
+            Some("Operator"),
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // New metadata URI
+        expanded_fields.push(Self::create_text_field(
+            "New Metadata URI",
+            &call.metadataURI,
+            Some("URI containing operator metadata and information"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -2067,8 +2094,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Update operator metadata URI".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -2076,29 +2103,35 @@ impl EigenLayerVisualizer {
     fn visualize_redelegate(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IDelegationManager::redelegateCall::abi_decode(input).ok()?;
 
-        let mut details = Vec::new();
+        let new_operator_addr = format!("{:?}", call.newOperator);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.newOperator),
-                    label: "New Operator".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.newOperator),
-                    name: "New Operator Address".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("Operator".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "New Operator",
+            &new_operator_addr,
+            Some("Operator"),
+            None,
+            None,
+            Some("Operator"),
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // New operator address
+        expanded_fields.push(Self::create_address_field(
+            "New Operator",
+            &new_operator_addr,
+            Some("Operator"),
+            None,
+            Some("Your stake will be delegated to this operator"),
+            Some("Operator"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: format!("Redelegate to operator {:?}", call.newOperator),
+                fallback_text: "Redelegate to new operator".to_string(),
                 label: "EigenLayer Redelegate".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -2108,8 +2141,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Switch to a new operator".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -2470,188 +2503,90 @@ impl EigenLayerVisualizer {
     // New RewardsCoordinator visualizers
     fn visualize_process_claims(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::processClaimsCall::abi_decode(input).ok()?;
+        let recipient_addr = format!("{:?}", call.recipient);
+        let claim_count = call.claims.len();
 
-        let mut details = Vec::new();
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field("Recipient", &recipient_addr, Some("Reward Recipient"), None, None, None));
+        condensed_fields.push(Self::create_number_field("Claims", &claim_count.to_string(), None));
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.recipient),
-                    label: "Recipient".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.recipient),
-                    name: "Reward Recipient".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
-
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.claims.len().to_string(),
-                    label: "Number of Claims".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.claims.len().to_string(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let mut expanded_fields = vec![];
+        expanded_fields.push(Self::create_address_field("Recipient", &recipient_addr, Some("Reward Recipient"), None, Some("Address receiving the rewards"), None));
+        expanded_fields.push(Self::create_divider());
+        expanded_fields.push(Self::create_number_field("Claims", &claim_count.to_string(), Some("Number of reward claims being processed")));
 
         Some(SignablePayloadField::PreviewLayout {
-            common: SignablePayloadFieldCommon {
-                fallback_text: format!("Process {} reward claim(s)", call.claims.len()),
-                label: "EigenLayer Batch Claim Rewards".to_string(),
-            },
+            common: SignablePayloadFieldCommon { fallback_text: format!("Process {} reward claims", claim_count), label: "EigenLayer Process Claims".to_string() },
             preview_layout: SignablePayloadFieldPreviewLayout {
-                title: Some(SignablePayloadFieldTextV2 {
-                    text: "EigenLayer: Process Multiple Claims".to_string(),
-                }),
-                subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: format!("{} claim(s)", call.claims.len()),
-                }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                title: Some(SignablePayloadFieldTextV2 { text: "EigenLayer: Process Claims".to_string() }),
+                subtitle: Some(SignablePayloadFieldTextV2 { text: format!("Process {} reward claims", claim_count) }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_create_rewards_for_all_earners(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::createRewardsForAllEarnersCall::abi_decode(input).ok()?;
+        let submission_count = call.rewardsSubmissions.len();
 
-        let mut details = Vec::new();
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_number_field("Submissions", &submission_count.to_string(), None));
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.rewardsSubmissions.len().to_string(),
-                    label: "Number of Submissions".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.rewardsSubmissions.len().to_string(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let mut expanded_fields = vec![];
+        expanded_fields.push(Self::create_number_field("Submissions", &submission_count.to_string(), Some("Number of reward submissions for all protocol earners")));
 
         Some(SignablePayloadField::PreviewLayout {
-            common: SignablePayloadFieldCommon {
-                fallback_text: format!(
-                    "Create rewards for all earners ({} submission(s))",
-                    call.rewardsSubmissions.len()
-                ),
-                label: "EigenLayer Rewards for All".to_string(),
-            },
+            common: SignablePayloadFieldCommon { fallback_text: format!("Create rewards for all earners ({} submissions)", submission_count), label: "EigenLayer Rewards for All".to_string() },
             preview_layout: SignablePayloadFieldPreviewLayout {
-                title: Some(SignablePayloadFieldTextV2 {
-                    text: "EigenLayer: Create Rewards for All Earners".to_string(),
-                }),
-                subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: format!("{} submission(s)", call.rewardsSubmissions.len()),
-                }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                title: Some(SignablePayloadFieldTextV2 { text: "EigenLayer: Create Rewards for All Earners".to_string() }),
+                subtitle: Some(SignablePayloadFieldTextV2 { text: format!("{} reward submissions", submission_count) }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_submit_root(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::submitRootCall::abi_decode(input).ok()?;
-
-        let mut details = Vec::new();
-
         let root_hex = format!("0x{}", hex::encode(call.root));
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: root_hex.clone(),
-                    label: "Merkle Root".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: root_hex,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.rewardsCalculationEndTimestamp.to_string(),
-                    label: "Calculation End Timestamp".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: call.rewardsCalculationEndTimestamp.to_string(),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_text_field("Merkle Root", &root_hex[..10], None));
+
+        let mut expanded_fields = vec![];
+        expanded_fields.push(Self::create_text_field("Merkle Root", &root_hex, Some("Root hash for rewards distribution merkle tree")));
+        expanded_fields.push(Self::create_divider());
+        expanded_fields.push(Self::create_text_field("End Timestamp", &call.rewardsCalculationEndTimestamp.to_string(), Some("Rewards calculation period end time")));
 
         Some(SignablePayloadField::PreviewLayout {
-            common: SignablePayloadFieldCommon {
-                fallback_text: "Submit rewards merkle root".to_string(),
-                label: "EigenLayer Submit Root".to_string(),
-            },
+            common: SignablePayloadFieldCommon { fallback_text: "Submit rewards merkle root".to_string(), label: "EigenLayer Submit Root".to_string() },
             preview_layout: SignablePayloadFieldPreviewLayout {
-                title: Some(SignablePayloadFieldTextV2 {
-                    text: "EigenLayer: Submit Rewards Root".to_string(),
-                }),
-                subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Submit merkle root for rewards distribution".to_string(),
-                }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                title: Some(SignablePayloadFieldTextV2 { text: "EigenLayer: Submit Rewards Root".to_string() }),
+                subtitle: Some(SignablePayloadFieldTextV2 { text: "Submit merkle root for rewards distribution".to_string() }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_claimer_for(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IRewardsCoordinatorExtended::setClaimerForCall::abi_decode(input).ok()?;
+        let claimer_addr = format!("{:?}", call.claimer);
 
-        let mut details = Vec::new();
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field("Claimer", &claimer_addr, Some("Claimer Address"), None, None, None));
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.claimer),
-                    label: "Claimer".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.claimer),
-                    name: "Claimer Address".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let mut expanded_fields = vec![];
+        expanded_fields.push(Self::create_address_field("Claimer", &claimer_addr, Some("Claimer Address"), None, Some("This address will be authorized to claim rewards on your behalf"), None));
 
         Some(SignablePayloadField::PreviewLayout {
-            common: SignablePayloadFieldCommon {
-                fallback_text: format!("Set claimer to {:?}", call.claimer),
-                label: "EigenLayer Set Claimer".to_string(),
-            },
+            common: SignablePayloadFieldCommon { fallback_text: "Set reward claimer".to_string(), label: "EigenLayer Set Claimer".to_string() },
             preview_layout: SignablePayloadFieldPreviewLayout {
-                title: Some(SignablePayloadFieldTextV2 {
-                    text: "EigenLayer: Set Claimer".to_string(),
-                }),
-                subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Set address that can claim rewards".to_string(),
-                }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                title: Some(SignablePayloadFieldTextV2 { text: "EigenLayer: Set Claimer".to_string() }),
+                subtitle: Some(SignablePayloadFieldTextV2 { text: "Set address that can claim rewards".to_string() }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -2659,65 +2594,71 @@ impl EigenLayerVisualizer {
     // Strategy Manager - Additional visualizers
     fn visualize_strategy_add_shares(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IStrategyManager::addSharesCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.staker),
-                    label: "Staker".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.staker),
-                    name: "Staker".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
-
+        let staker_addr = format!("{:?}", call.staker);
         let strategy_addr = format!("{:?}", call.strategy);
-        let strategy_name = KnownContracts::get_strategy_name(&strategy_addr).unwrap_or("Unknown Strategy");
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: strategy_addr.clone(),
-                    label: "Strategy".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: strategy_addr,
-                    name: strategy_name.to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("EigenLayer".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AmountV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.shares),
-                    label: "Shares".to_string(),
-                },
-                amount_v2: SignablePayloadFieldAmountV2 {
-                    amount: format!("{}", call.shares),
-                    abbreviation: Some("shares".to_string()),
-                    
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Get strategy info
+        let strategy_info = KnownContracts::get_strategy_info(&strategy_addr);
+        let strategy_name = strategy_info.as_ref().map(|i| i.name).unwrap_or("Unknown Strategy");
+        let token_symbol = strategy_info.as_ref().map(|i| i.token_symbol);
+
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Staker",
+            &staker_addr,
+            Some("Staker"),
+            None,
+            None,
+            None,
+        ));
+        condensed_fields.push(Self::create_amount_field(
+            "Shares",
+            call.shares,
+            Some("shares"),
+            None,
+            None,
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Staker address
+        expanded_fields.push(Self::create_address_field(
+            "Staker",
+            &staker_addr,
+            Some("Staker"),
+            None,
+            None,
+            None,
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // Strategy with full info
+        expanded_fields.push(Self::create_address_field(
+            "Strategy",
+            &strategy_addr,
+            Some(strategy_name),
+            token_symbol,
+            strategy_info.as_ref().map(|i| i.description),
+            Some("Verified"),
+        ));
+
+        // Shares amount with annotation
+        expanded_fields.push(Self::create_amount_field(
+            "Shares",
+            call.shares,
+            Some("shares"),
+            Some("Increases staker's strategy balance"),
+            None,
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Add shares to staker".to_string(),
+                fallback_text: format!("Add {} shares to staker", format_ether(call.shares)),
                 label: "EigenLayer Add Shares".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -2725,75 +2666,81 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Add Shares".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Add shares to staker's strategy balance".to_string(),
+                    text: format!("Add {} shares to {}", format_ether(call.shares), strategy_name),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_strategy_remove_deposit_shares(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IStrategyManager::removeDepositSharesCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.staker),
-                    label: "Staker".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.staker),
-                    name: "Staker".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
-
+        let staker_addr = format!("{:?}", call.staker);
         let strategy_addr = format!("{:?}", call.strategy);
-        let strategy_name = KnownContracts::get_strategy_name(&strategy_addr).unwrap_or("Unknown Strategy");
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: strategy_addr.clone(),
-                    label: "Strategy".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: strategy_addr,
-                    name: strategy_name.to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("EigenLayer".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AmountV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.depositSharesToRemove),
-                    label: "Shares to Remove".to_string(),
-                },
-                amount_v2: SignablePayloadFieldAmountV2 {
-                    amount: format!("{}", call.depositSharesToRemove),
-                    abbreviation: Some("shares".to_string()),
-                    
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Get strategy info
+        let strategy_info = KnownContracts::get_strategy_info(&strategy_addr);
+        let strategy_name = strategy_info.as_ref().map(|i| i.name).unwrap_or("Unknown Strategy");
+        let token_symbol = strategy_info.as_ref().map(|i| i.token_symbol);
+
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Staker",
+            &staker_addr,
+            Some("Staker"),
+            None,
+            None,
+            None,
+        ));
+        condensed_fields.push(Self::create_amount_field(
+            "Shares to Remove",
+            call.depositSharesToRemove,
+            Some("shares"),
+            None,
+            None,
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Staker address
+        expanded_fields.push(Self::create_address_field(
+            "Staker",
+            &staker_addr,
+            Some("Staker"),
+            None,
+            None,
+            None,
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // Strategy with full info
+        expanded_fields.push(Self::create_address_field(
+            "Strategy",
+            &strategy_addr,
+            Some(strategy_name),
+            token_symbol,
+            strategy_info.as_ref().map(|i| i.description),
+            Some("Verified"),
+        ));
+
+        // Shares amount with annotation
+        expanded_fields.push(Self::create_amount_field(
+            "Shares to Remove",
+            call.depositSharesToRemove,
+            Some("shares"),
+            Some("Reduces staker's deposited shares"),
+            None,
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Remove deposit shares".to_string(),
+                fallback_text: format!("Remove {} shares", format_ether(call.depositSharesToRemove)),
                 label: "EigenLayer Remove Shares".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -2801,93 +2748,95 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Remove Deposit Shares".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Remove shares from staker's deposit".to_string(),
+                    text: format!("Remove {} shares from {}", format_ether(call.depositSharesToRemove), strategy_name),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_strategy_withdraw_shares_as_tokens(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IStrategyManager::withdrawSharesAsTokensCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.staker),
-                    label: "Staker".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.staker),
-                    name: "Staker".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
-
+        let staker_addr = format!("{:?}", call.staker);
         let strategy_addr = format!("{:?}", call.strategy);
-        let strategy_name = KnownContracts::get_strategy_name(&strategy_addr).unwrap_or("Unknown Strategy");
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: strategy_addr.clone(),
-                    label: "Strategy".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: strategy_addr,
-                    name: strategy_name.to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("EigenLayer".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let token_addr = format!("{:?}", call.token);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.token),
-                    label: "Token".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.token),
-                    name: "Token".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Get strategy and token info
+        let strategy_info = KnownContracts::get_strategy_info(&strategy_addr);
+        let strategy_name = strategy_info.as_ref().map(|i| i.name).unwrap_or("Unknown Strategy");
+        let token_symbol = strategy_info.as_ref()
+            .map(|i| i.token_symbol)
+            .or_else(|| KnownContracts::get_token_symbol(&token_addr));
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AmountV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.shares),
-                    label: "Shares".to_string(),
-                },
-                amount_v2: SignablePayloadFieldAmountV2 {
-                    amount: format!("{}", call.shares),
-                    abbreviation: Some("shares".to_string()),
-                    
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Strategy",
+            &strategy_addr,
+            Some(strategy_name),
+            token_symbol,
+            None,
+            Some("Verified"),
+        ));
+        condensed_fields.push(Self::create_amount_field(
+            "Shares",
+            call.shares,
+            Some("shares"),
+            None,
+            None,
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Staker address
+        expanded_fields.push(Self::create_address_field(
+            "Staker",
+            &staker_addr,
+            Some("Staker"),
+            None,
+            None,
+            None,
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // Strategy with full info
+        expanded_fields.push(Self::create_address_field(
+            "Strategy",
+            &strategy_addr,
+            Some(strategy_name),
+            token_symbol,
+            strategy_info.as_ref().map(|i| i.description),
+            Some("Verified"),
+        ));
+
+        // Token address
+        let token_name = token_symbol.unwrap_or("Token");
+        expanded_fields.push(Self::create_address_field(
+            "Token",
+            &token_addr,
+            Some(token_name),
+            token_symbol,
+            None,
+            None,
+        ));
+
+        // Shares amount with annotation
+        expanded_fields.push(Self::create_amount_field(
+            "Shares",
+            call.shares,
+            Some("shares"),
+            Some("Converts shares to tokens and withdraws"),
+            None,
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Withdraw shares as tokens".to_string(),
+                fallback_text: format!("Withdraw {} shares as tokens", format_ether(call.shares)),
                 label: "EigenLayer Withdraw Shares".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -2895,35 +2844,68 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Withdraw Shares as Tokens".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Convert shares to tokens and withdraw".to_string(),
+                    text: format!("Withdraw {} shares from {}", format_ether(call.shares), strategy_name),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_add_strategies_to_whitelist(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IStrategyManager::addStrategiesToDepositWhitelistCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} strategies", call.strategiesToWhitelist.len()),
-                    label: "Number of Strategies".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{} strategies", call.strategiesToWhitelist.len()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let strategy_count = call.strategiesToWhitelist.len();
+
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_number_field(
+            "Strategies",
+            &strategy_count.to_string(),
+            Some("Number of strategies to whitelist"),
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Strategy count
+        expanded_fields.push(Self::create_number_field(
+            "Strategy Count",
+            &strategy_count.to_string(),
+            Some("Total strategies being whitelisted"),
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // List each strategy
+        for (i, strategy) in call.strategiesToWhitelist.iter().enumerate().take(5) {
+            let strategy_addr = format!("{:?}", strategy);
+            let strategy_info = KnownContracts::get_strategy_info(&strategy_addr);
+            let strategy_name = strategy_info.as_ref().map(|i| i.name).unwrap_or("Unknown Strategy");
+            let token_symbol = strategy_info.as_ref().map(|i| i.token_symbol);
+
+            expanded_fields.push(Self::create_address_field(
+                &format!("Strategy {}", i + 1),
+                &strategy_addr,
+                Some(strategy_name),
+                token_symbol,
+                strategy_info.as_ref().map(|i| i.description),
+                Some("Verified"),
+            ));
+        }
+
+        if strategy_count > 5 {
+            expanded_fields.push(Self::create_text_field(
+                "Additional Strategies",
+                &format!("... and {} more", strategy_count - 5),
+                None,
+            ));
+        }
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Add strategies to whitelist".to_string(),
+                fallback_text: format!("Add {} strategies to whitelist", strategy_count),
                 label: "EigenLayer Add Strategies".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -2931,35 +2913,68 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Add Strategies to Whitelist".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Enable strategies for deposits".to_string(),
+                    text: format!("Enable {} strategies for deposits", strategy_count),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_remove_strategies_from_whitelist(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IStrategyManager::removeStrategiesFromDepositWhitelistCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} strategies", call.strategiesToRemoveFromWhitelist.len()),
-                    label: "Number of Strategies".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{} strategies", call.strategiesToRemoveFromWhitelist.len()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let strategy_count = call.strategiesToRemoveFromWhitelist.len();
+
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_number_field(
+            "Strategies",
+            &strategy_count.to_string(),
+            Some("Number of strategies to remove"),
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Strategy count
+        expanded_fields.push(Self::create_number_field(
+            "Strategy Count",
+            &strategy_count.to_string(),
+            Some("Total strategies being removed from whitelist"),
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // List each strategy
+        for (i, strategy) in call.strategiesToRemoveFromWhitelist.iter().enumerate().take(5) {
+            let strategy_addr = format!("{:?}", strategy);
+            let strategy_info = KnownContracts::get_strategy_info(&strategy_addr);
+            let strategy_name = strategy_info.as_ref().map(|i| i.name).unwrap_or("Unknown Strategy");
+            let token_symbol = strategy_info.as_ref().map(|i| i.token_symbol);
+
+            expanded_fields.push(Self::create_address_field(
+                &format!("Strategy {}", i + 1),
+                &strategy_addr,
+                Some(strategy_name),
+                token_symbol,
+                strategy_info.as_ref().map(|i| i.description),
+                Some("Verified"),
+            ));
+        }
+
+        if strategy_count > 5 {
+            expanded_fields.push(Self::create_text_field(
+                "Additional Strategies",
+                &format!("... and {} more", strategy_count - 5),
+                None,
+            ));
+        }
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Remove strategies from whitelist".to_string(),
+                fallback_text: format!("Remove {} strategies from whitelist", strategy_count),
                 label: "EigenLayer Remove Strategies".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -2967,35 +2982,42 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Remove Strategies from Whitelist".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Disable strategies for deposits".to_string(),
+                    text: format!("Disable {} strategies for deposits", strategy_count),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_strategy_whitelister(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IStrategyManager::setStrategyWhitelisterCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.newStrategyWhitelister),
-                    label: "New Whitelister".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.newStrategyWhitelister),
-                    name: "Strategy Whitelister".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let whitelister_addr = format!("{:?}", call.newStrategyWhitelister);
+
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "New Whitelister",
+            &whitelister_addr,
+            Some("Strategy Whitelister"),
+            None,
+            None,
+            Some("Admin"),
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // New whitelister with warning
+        expanded_fields.push(Self::create_address_field(
+            "New Whitelister",
+            &whitelister_addr,
+            Some("Strategy Whitelister"),
+            None,
+            Some("This address will control which strategies can accept deposits"),
+            Some("Admin"),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3009,8 +3031,8 @@ impl EigenLayerVisualizer {
                 subtitle: Some(SignablePayloadFieldTextV2 {
                     text: "Change strategy whitelist manager".to_string(),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -3018,65 +3040,71 @@ impl EigenLayerVisualizer {
     // Delegation Manager - Additional visualizers
     fn visualize_increase_delegated_shares(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IDelegationManager::increaseDelegatedSharesCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.staker),
-                    label: "Staker".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.staker),
-                    name: "Staker".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
-
+        let staker_addr = format!("{:?}", call.staker);
         let strategy_addr = format!("{:?}", call.strategy);
-        let strategy_name = KnownContracts::get_strategy_name(&strategy_addr).unwrap_or("Unknown Strategy");
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: strategy_addr.clone(),
-                    label: "Strategy".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: strategy_addr,
-                    name: strategy_name.to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("EigenLayer".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AmountV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.addedShares),
-                    label: "Added Shares".to_string(),
-                },
-                amount_v2: SignablePayloadFieldAmountV2 {
-                    amount: format!("{}", call.addedShares),
-                    abbreviation: Some("shares".to_string()),
-                    
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Get strategy info
+        let strategy_info = KnownContracts::get_strategy_info(&strategy_addr);
+        let strategy_name = strategy_info.as_ref().map(|i| i.name).unwrap_or("Unknown Strategy");
+        let token_symbol = strategy_info.as_ref().map(|i| i.token_symbol);
+
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Staker",
+            &staker_addr,
+            Some("Staker"),
+            None,
+            None,
+            None,
+        ));
+        condensed_fields.push(Self::create_amount_field(
+            "Added Shares",
+            call.addedShares,
+            Some("shares"),
+            None,
+            None,
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Staker address
+        expanded_fields.push(Self::create_address_field(
+            "Staker",
+            &staker_addr,
+            Some("Staker"),
+            None,
+            None,
+            None,
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // Strategy with full info
+        expanded_fields.push(Self::create_address_field(
+            "Strategy",
+            &strategy_addr,
+            Some(strategy_name),
+            token_symbol,
+            strategy_info.as_ref().map(|i| i.description),
+            Some("Verified"),
+        ));
+
+        // Shares amount with annotation
+        expanded_fields.push(Self::create_amount_field(
+            "Added Shares",
+            call.addedShares,
+            Some("shares"),
+            Some("Increases delegated shares for this strategy"),
+            None,
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Increase delegated shares".to_string(),
+                fallback_text: format!("Increase delegated shares by {}", format_ether(call.addedShares)),
                 label: "EigenLayer Increase Shares".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -3084,55 +3112,65 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Increase Delegated Shares".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Add shares to delegation".to_string(),
+                    text: format!("Add {} shares to delegation", format_ether(call.addedShares)),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_decrease_delegated_shares(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IDelegationManager::decreaseDelegatedSharesCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.staker),
-                    label: "Staker".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.staker),
-                    name: "Staker".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let staker_addr = format!("{:?}", call.staker);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AmountV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.curDepositShares),
-                    label: "Current Deposit Shares".to_string(),
-                },
-                amount_v2: SignablePayloadFieldAmountV2 {
-                    amount: format!("{}", call.curDepositShares),
-                    abbreviation: Some("shares".to_string()),
-                    
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Staker",
+            &staker_addr,
+            Some("Staker"),
+            None,
+            None,
+            None,
+        ));
+        condensed_fields.push(Self::create_amount_field(
+            "Deposit Shares",
+            call.curDepositShares,
+            Some("shares"),
+            None,
+            None,
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Staker address
+        expanded_fields.push(Self::create_address_field(
+            "Staker",
+            &staker_addr,
+            Some("Staker"),
+            None,
+            None,
+            None,
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // Shares amount with annotation
+        expanded_fields.push(Self::create_amount_field(
+            "Current Deposit Shares",
+            call.curDepositShares,
+            Some("shares"),
+            Some("Decreases delegated shares for this strategy"),
+            None,
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Decrease delegated shares".to_string(),
+                fallback_text: format!("Decrease delegated shares by {}", format_ether(call.curDepositShares)),
                 label: "EigenLayer Decrease Shares".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -3140,53 +3178,95 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Decrease Delegated Shares".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Remove shares from delegation".to_string(),
+                    text: format!("Remove {} shares from delegation", format_ether(call.curDepositShares)),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_slash_operator_shares(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IDelegationManager::slashOperatorSharesCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.operator),
-                    label: "Operator".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.operator),
-                    name: "Operator".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("Operator".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let operator_addr = format!("{:?}", call.operator);
+        let strategy_count = call.strategies.len();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{} strategies", call.strategies.len()),
-                    label: "Number of Strategies".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{} strategies", call.strategies.len()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Operator",
+            &operator_addr,
+            Some("Operator"),
+            None,
+            None,
+            Some("Operator"),
+        ));
+        condensed_fields.push(Self::create_number_field(
+            "Strategies",
+            &strategy_count.to_string(),
+            Some("Number of strategies being slashed"),
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Operator address with warning
+        expanded_fields.push(Self::create_address_field(
+            "Operator",
+            &operator_addr,
+            Some("Operator"),
+            None,
+            Some("This operator is being slashed for misbehavior"),
+            Some("Operator"),
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // Strategy count
+        expanded_fields.push(Self::create_number_field(
+            "Strategies Affected",
+            &strategy_count.to_string(),
+            Some("Total strategies being slashed"),
+        ));
+
+        // List strategies and amounts
+        for (i, (strategy, shares)) in call.strategies.iter().zip(call.shareAmounts.iter()).enumerate().take(3) {
+            let strategy_addr = format!("{:?}", strategy);
+            let strategy_info = KnownContracts::get_strategy_info(&strategy_addr);
+            let strategy_name = strategy_info.as_ref().map(|i| i.name).unwrap_or("Unknown Strategy");
+            let token_symbol = strategy_info.as_ref().map(|i| i.token_symbol);
+
+            expanded_fields.push(Self::create_address_field(
+                &format!("Strategy {}", i + 1),
+                &strategy_addr,
+                Some(strategy_name),
+                token_symbol,
+                None,
+                Some("Verified"),
+            ));
+
+            expanded_fields.push(Self::create_amount_field(
+                &format!("Slash Amount {}", i + 1),
+                *shares,
+                Some("shares"),
+                Some("Shares being slashed"),
+                None,
+            ));
+        }
+
+        if strategy_count > 3 {
+            expanded_fields.push(Self::create_text_field(
+                "Additional",
+                &format!("... and {} more strategies", strategy_count - 3),
+                None,
+            ));
+        }
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Slash operator shares".to_string(),
+                fallback_text: format!("Slash operator across {} strategies", strategy_count),
                 label: "EigenLayer Slash Operator".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -3194,10 +3274,10 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Slash Operator Shares".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Slash operator for misbehavior".to_string(),
+                    text: format!("Slash operator across {} strategies", strategy_count),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
@@ -3205,45 +3285,55 @@ impl EigenLayerVisualizer {
     // EigenPodManager - Additional visualizers
     fn visualize_eigenpod_add_shares(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IEigenPodManager::addSharesCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.podOwner),
-                    label: "Pod Owner".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.podOwner),
-                    name: "Pod Owner".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let pod_owner_addr = format!("{:?}", call.podOwner);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AmountV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.shares),
-                    label: "Shares".to_string(),
-                },
-                amount_v2: SignablePayloadFieldAmountV2 {
-                    amount: format!("{}", call.shares),
-                    abbreviation: Some("shares".to_string()),
-                    
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view - key info only
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Pod Owner",
+            &pod_owner_addr,
+            Some("Pod Owner"),
+            None,
+            None,
+            None,
+        ));
+        condensed_fields.push(Self::create_amount_field(
+            "Shares",
+            call.shares,
+            Some("shares"),
+            None,
+            None,
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Pod owner address
+        expanded_fields.push(Self::create_address_field(
+            "Pod Owner",
+            &pod_owner_addr,
+            Some("Pod Owner"),
+            None,
+            None,
+            None,
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
+
+        // Shares amount with annotation
+        expanded_fields.push(Self::create_amount_field(
+            "Shares",
+            call.shares,
+            Some("shares"),
+            Some("Beacon chain ETH shares being added to pod"),
+            None,
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Add EigenPod shares".to_string(),
+                fallback_text: format!("Add {} EigenPod shares", format_ether(call.shares)),
                 label: "EigenLayer Add Pod Shares".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
@@ -3251,179 +3341,91 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Add EigenPod Shares".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Add beacon chain ETH shares to pod".to_string(),
+                    text: format!("Add {} shares to pod", format_ether(call.shares)),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_eigenpod_remove_deposit_shares(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IEigenPodManager::removeDepositSharesCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.podOwner),
-                    label: "Pod Owner".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.podOwner),
-                    name: "Pod Owner".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let pod_owner_addr = format!("{:?}", call.podOwner);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AmountV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.depositSharesToRemove),
-                    label: "Shares to Remove".to_string(),
-                },
-                amount_v2: SignablePayloadFieldAmountV2 {
-                    amount: format!("{}", call.depositSharesToRemove),
-                    abbreviation: Some("shares".to_string()),
-                    
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field("Pod Owner", &pod_owner_addr, Some("Pod Owner"), None, None, None));
+        condensed_fields.push(Self::create_amount_field("Shares to Remove", call.depositSharesToRemove, Some("shares"), None, None));
+
+        // Expanded view
+        let mut expanded_fields = vec![];
+        expanded_fields.push(Self::create_address_field("Pod Owner", &pod_owner_addr, Some("Pod Owner"), None, None, None));
+        expanded_fields.push(Self::create_divider());
+        expanded_fields.push(Self::create_amount_field("Shares to Remove", call.depositSharesToRemove, Some("shares"), Some("Reduces pod deposit shares"), None));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Remove EigenPod deposit shares".to_string(),
+                fallback_text: format!("Remove {} EigenPod shares", format_ether(call.depositSharesToRemove)),
                 label: "EigenLayer Remove Pod Shares".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
-                title: Some(SignablePayloadFieldTextV2 {
-                    text: "EigenLayer: Remove EigenPod Deposit Shares".to_string(),
-                }),
-                subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Remove deposit shares from pod".to_string(),
-                }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                title: Some(SignablePayloadFieldTextV2 { text: "EigenLayer: Remove EigenPod Deposit Shares".to_string() }),
+                subtitle: Some(SignablePayloadFieldTextV2 { text: format!("Remove {} shares from pod", format_ether(call.depositSharesToRemove)) }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_eigenpod_withdraw_shares_as_tokens(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IEigenPodManager::withdrawSharesAsTokensCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.podOwner),
-                    label: "Pod Owner".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.podOwner),
-                    name: "Pod Owner".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let pod_owner_addr = format!("{:?}", call.podOwner);
+        let destination_addr = format!("{:?}", call.destination);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.destination),
-                    label: "Destination".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.destination),
-                    name: "Destination".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field("Destination", &destination_addr, Some("Recipient"), None, None, None));
+        condensed_fields.push(Self::create_amount_field("Shares", call.shares, Some("ETH"), None, None));
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AmountV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.shares),
-                    label: "Shares".to_string(),
-                },
-                amount_v2: SignablePayloadFieldAmountV2 {
-                    amount: format!("{}", call.shares),
-                    abbreviation: Some("shares".to_string()),
-                    
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Expanded view
+        let mut expanded_fields = vec![];
+        expanded_fields.push(Self::create_address_field("Pod Owner", &pod_owner_addr, Some("Pod Owner"), None, None, None));
+        expanded_fields.push(Self::create_divider());
+        expanded_fields.push(Self::create_address_field("Destination", &destination_addr, Some("Recipient"), None, Some("ETH will be sent to this address"), None));
+        expanded_fields.push(Self::create_amount_field("Shares", call.shares, Some("ETH"), Some("Converts shares to ETH and withdraws"), None));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
-                fallback_text: "Withdraw EigenPod shares as tokens".to_string(),
+                fallback_text: format!("Withdraw {} ETH from EigenPod", format_ether(call.shares)),
                 label: "EigenLayer Withdraw Pod Shares".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
-                title: Some(SignablePayloadFieldTextV2 {
-                    text: "EigenLayer: Withdraw EigenPod Shares".to_string(),
-                }),
-                subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Convert pod shares to ETH and withdraw".to_string(),
-                }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                title: Some(SignablePayloadFieldTextV2 { text: "EigenLayer: Withdraw EigenPod Shares".to_string() }),
+                subtitle: Some(SignablePayloadFieldTextV2 { text: format!("Withdraw {} ETH from pod", format_ether(call.shares)) }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_record_beacon_chain_balance_update(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IEigenPodManager::recordBeaconChainETHBalanceUpdateCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.podOwner),
-                    label: "Pod Owner".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.podOwner),
-                    name: "Pod Owner".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let pod_owner_addr = format!("{:?}", call.podOwner);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.balanceDeltaWei),
-                    label: "Balance Delta".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{} wei", call.balanceDeltaWei),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field("Pod Owner", &pod_owner_addr, Some("Pod Owner"), None, None, None));
+        condensed_fields.push(Self::create_text_field("Balance Delta", &format!("{} wei", call.balanceDeltaWei), None));
+
+        // Expanded view
+        let mut expanded_fields = vec![];
+        expanded_fields.push(Self::create_address_field("Pod Owner", &pod_owner_addr, Some("Pod Owner"), None, None, None));
+        expanded_fields.push(Self::create_divider());
+        expanded_fields.push(Self::create_text_field("Balance Delta", &format!("{} wei", call.balanceDeltaWei), Some("Change in beacon chain ETH balance")));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3431,35 +3433,24 @@ impl EigenLayerVisualizer {
                 label: "EigenLayer Balance Update".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
-                title: Some(SignablePayloadFieldTextV2 {
-                    text: "EigenLayer: Record Beacon Chain Balance".to_string(),
-                }),
-                subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Update beacon chain ETH balance".to_string(),
-                }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                title: Some(SignablePayloadFieldTextV2 { text: "EigenLayer: Record Beacon Chain Balance".to_string() }),
+                subtitle: Some(SignablePayloadFieldTextV2 { text: "Update beacon chain ETH balance".to_string() }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_pectra_fork_timestamp(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IEigenPodManager::setPectraForkTimestampCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::TextV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{}", call.timestamp),
-                    label: "Timestamp".to_string(),
-                },
-                text_v2: SignablePayloadFieldTextV2 {
-                    text: format!("{}", call.timestamp),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Condensed view
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_text_field("Timestamp", &call.timestamp.to_string(), Some("Pectra fork activation time")));
+
+        // Expanded view
+        let mut expanded_fields = vec![];
+        expanded_fields.push(Self::create_text_field("Timestamp", &call.timestamp.to_string(), Some("Unix timestamp for Pectra fork activation - affects validator withdrawal credentials")));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3467,39 +3458,26 @@ impl EigenLayerVisualizer {
                 label: "EigenLayer Set Fork Time".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
-                title: Some(SignablePayloadFieldTextV2 {
-                    text: "EigenLayer: Set Pectra Fork Timestamp".to_string(),
-                }),
-                subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Configure Pectra upgrade timing".to_string(),
-                }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                title: Some(SignablePayloadFieldTextV2 { text: "EigenLayer: Set Pectra Fork Timestamp".to_string() }),
+                subtitle: Some(SignablePayloadFieldTextV2 { text: "Configure Pectra upgrade timing".to_string() }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
 
     fn visualize_set_proof_timestamp_setter(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IEigenPodManager::setProofTimestampSetterCall::abi_decode(input).ok()?;
-        let mut details = Vec::new();
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.newProofTimestampSetter),
-                    label: "New Setter".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.newProofTimestampSetter),
-                    name: "Proof Timestamp Setter".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let setter_addr = format!("{:?}", call.newProofTimestampSetter);
+
+        // Condensed view
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field("New Setter", &setter_addr, Some("Proof Timestamp Setter"), None, None, Some("Admin")));
+
+        // Expanded view
+        let mut expanded_fields = vec![];
+        expanded_fields.push(Self::create_address_field("New Setter", &setter_addr, Some("Proof Timestamp Setter"), None, Some("This address will control proof timestamp settings for beacon chain validation"), Some("Admin")));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
@@ -3507,14 +3485,10 @@ impl EigenLayerVisualizer {
                 label: "EigenLayer Set Proof Setter".to_string(),
             },
             preview_layout: SignablePayloadFieldPreviewLayout {
-                title: Some(SignablePayloadFieldTextV2 {
-                    text: "EigenLayer: Set Proof Timestamp Setter".to_string(),
-                }),
-                subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: "Change proof timestamp manager".to_string(),
-                }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                title: Some(SignablePayloadFieldTextV2 { text: "EigenLayer: Set Proof Timestamp Setter".to_string() }),
+                subtitle: Some(SignablePayloadFieldTextV2 { text: "Change proof timestamp manager".to_string() }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
