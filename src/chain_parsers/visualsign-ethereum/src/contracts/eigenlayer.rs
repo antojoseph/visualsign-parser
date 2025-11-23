@@ -1,9 +1,13 @@
 use alloy_sol_types::{SolCall, sol};
+use alloy_primitives::U256;
 use visualsign::{
     AnnotatedPayloadField, SignablePayloadField, SignablePayloadFieldAddressV2,
-    SignablePayloadFieldAmountV2, SignablePayloadFieldCommon, SignablePayloadFieldListLayout,
-    SignablePayloadFieldPreviewLayout, SignablePayloadFieldTextV2,
+    SignablePayloadFieldAmountV2, SignablePayloadFieldCommon, SignablePayloadFieldDivider,
+    SignablePayloadFieldDynamicAnnotation, SignablePayloadFieldListLayout,
+    SignablePayloadFieldNumber, SignablePayloadFieldPreviewLayout,
+    SignablePayloadFieldStaticAnnotation, SignablePayloadFieldTextV2, DividerStyle,
 };
+use crate::fmt::format_ether;
 
 // EigenLayer contract interfaces
 // Based on: https://github.com/Layr-Labs/eigenlayer-contracts
@@ -335,31 +339,286 @@ impl KnownContracts {
     pub const REWARDS_COORDINATOR: &'static str = "0x7750d328b314EfFa365A0402CcfD489B80B0adda";
     pub const ALLOCATION_MANAGER: &'static str = "0x948a420b8CC1d6BFd0B6087C2E7c344a2CD0bc39";
 
-    // Known strategies with human-readable names
-    pub fn get_strategy_name(address: &str) -> Option<&'static str> {
+    // Token addresses
+    pub const STETH_TOKEN: &'static str = "0xae7ab96520de3a18e5e111b5eaab095312d7fe84";
+    pub const CBETH_TOKEN: &'static str = "0xbe9895146f7af43049ca1c1ae358b0541ea49704";
+    pub const RETH_TOKEN: &'static str = "0xae78736cd615f374d3085123a210448e74fc6393";
+    pub const ETHX_TOKEN: &'static str = "0xa35b1b31ce002fbf2058d22f30f95d405200a15b";
+    pub const ANKRETH_TOKEN: &'static str = "0xe95a203b1a91a908f9b9ce46459d101078c2c3cb";
+    pub const OETH_TOKEN: &'static str = "0x856c4efb76c1d1ae02e20ceb03a2a6a08b0b8dc3";
+    pub const OSETH_TOKEN: &'static str = "0xf1c9acdc66974dfb6decb12aa385b9cd01190e38";
+    pub const SWETH_TOKEN: &'static str = "0xf951e335afb289353dc249e82926178eac7ded78";
+    pub const WBETH_TOKEN: &'static str = "0xa2e3356610840701bdf5611a53974510ae27e2e1";
+    pub const SFRXETH_TOKEN: &'static str = "0xac3e018457b222d93114458476f3e3416abbe38f";
+    pub const LSETH_TOKEN: &'static str = "0x8c1bed5b9a0928467c9b1341da1d7bd5e10b6549";
+    pub const METH_TOKEN: &'static str = "0xd5f7838f5c461feff7fe49ea5ebaf7728bb0adfa";
+    pub const EIGEN_TOKEN: &'static str = "0xec53bf9167f50cdeb3ae105f56099aaab9061f83";
+
+    // Known strategies with human-readable names and metadata
+    pub fn get_strategy_info(address: &str) -> Option<StrategyInfo> {
         match address.to_lowercase().as_str() {
-            "0x93c4b944d05dfe6df7645a86cd2206016c51564d" => Some("stETH Strategy"),
-            "0x54945180db7943c0ed0fee7edab2bd24620256bc" => Some("cbETH Strategy"),
-            "0x1bee69b7dfffa4e2d53c2a2df135c388ad25dcd2" => Some("rETH Strategy"),
-            "0x9d7ed45ee2e8fc5482fa2428f15c971e6369011d" => Some("ETHx Strategy"),
-            "0x13760f50a9d7377e4f20cb8cf9e4c26586c658ff" => Some("ankrETH Strategy"),
-            "0xa4c637e0f704745d182e4d38cab7e7485321d059" => Some("OETH Strategy"),
-            "0x57ba429517c3473b6d34ca9acd56c0e735b94c02" => Some("osETH Strategy"),
-            "0x0fe4f44bee93503346a3ac9ee5a26b130a5796d6" => Some("swETH Strategy"),
-            "0x7ca911e83dabf90c90dd3de5411a10f1a6112184" => Some("wBETH Strategy"),
-            "0x8ca7a5d6f3acd3a7a8bc468a8cd0fb14b6bd28b6" => Some("sfrxETH Strategy"),
-            "0xae60d8180437b5c34bb956822ac2710972584473" => Some("lsETH Strategy"),
-            "0x298afb19a105d59e74658c4c334ff360bade6dd2" => Some("mETH Strategy"),
-            "0xacb55c530acdb2849e6d4f36992cd8c9d50ed8f7" => Some("EIGEN Strategy"),
-            "0xbeac0eeeeeeeeeeeeeeeeeeeeeeeeeeeeeebeac0" => Some("Beacon Chain ETH"),
+            "0x93c4b944d05dfe6df7645a86cd2206016c51564d" => Some(StrategyInfo {
+                name: "stETH Strategy",
+                token_symbol: "stETH",
+                token_address: Self::STETH_TOKEN,
+                description: "Lido Staked ETH",
+                is_verified: true,
+            }),
+            "0x54945180db7943c0ed0fee7edab2bd24620256bc" => Some(StrategyInfo {
+                name: "cbETH Strategy",
+                token_symbol: "cbETH",
+                token_address: Self::CBETH_TOKEN,
+                description: "Coinbase Wrapped Staked ETH",
+                is_verified: true,
+            }),
+            "0x1bee69b7dfffa4e2d53c2a2df135c388ad25dcd2" => Some(StrategyInfo {
+                name: "rETH Strategy",
+                token_symbol: "rETH",
+                token_address: Self::RETH_TOKEN,
+                description: "Rocket Pool ETH",
+                is_verified: true,
+            }),
+            "0x9d7ed45ee2e8fc5482fa2428f15c971e6369011d" => Some(StrategyInfo {
+                name: "ETHx Strategy",
+                token_symbol: "ETHx",
+                token_address: Self::ETHX_TOKEN,
+                description: "Stader ETHx",
+                is_verified: true,
+            }),
+            "0x13760f50a9d7377e4f20cb8cf9e4c26586c658ff" => Some(StrategyInfo {
+                name: "ankrETH Strategy",
+                token_symbol: "ankrETH",
+                token_address: Self::ANKRETH_TOKEN,
+                description: "Ankr Staked ETH",
+                is_verified: true,
+            }),
+            "0xa4c637e0f704745d182e4d38cab7e7485321d059" => Some(StrategyInfo {
+                name: "OETH Strategy",
+                token_symbol: "OETH",
+                token_address: Self::OETH_TOKEN,
+                description: "Origin ETH",
+                is_verified: true,
+            }),
+            "0x57ba429517c3473b6d34ca9acd56c0e735b94c02" => Some(StrategyInfo {
+                name: "osETH Strategy",
+                token_symbol: "osETH",
+                token_address: Self::OSETH_TOKEN,
+                description: "StakeWise osETH",
+                is_verified: true,
+            }),
+            "0x0fe4f44bee93503346a3ac9ee5a26b130a5796d6" => Some(StrategyInfo {
+                name: "swETH Strategy",
+                token_symbol: "swETH",
+                token_address: Self::SWETH_TOKEN,
+                description: "Swell ETH",
+                is_verified: true,
+            }),
+            "0x7ca911e83dabf90c90dd3de5411a10f1a6112184" => Some(StrategyInfo {
+                name: "wBETH Strategy",
+                token_symbol: "wBETH",
+                token_address: Self::WBETH_TOKEN,
+                description: "Binance Wrapped Beacon ETH",
+                is_verified: true,
+            }),
+            "0x8ca7a5d6f3acd3a7a8bc468a8cd0fb14b6bd28b6" => Some(StrategyInfo {
+                name: "sfrxETH Strategy",
+                token_symbol: "sfrxETH",
+                token_address: Self::SFRXETH_TOKEN,
+                description: "Frax Staked ETH",
+                is_verified: true,
+            }),
+            "0xae60d8180437b5c34bb956822ac2710972584473" => Some(StrategyInfo {
+                name: "lsETH Strategy",
+                token_symbol: "lsETH",
+                token_address: Self::LSETH_TOKEN,
+                description: "Liquid Staked ETH",
+                is_verified: true,
+            }),
+            "0x298afb19a105d59e74658c4c334ff360bade6dd2" => Some(StrategyInfo {
+                name: "mETH Strategy",
+                token_symbol: "mETH",
+                token_address: Self::METH_TOKEN,
+                description: "Mantle Staked ETH",
+                is_verified: true,
+            }),
+            "0xacb55c530acdb2849e6d4f36992cd8c9d50ed8f7" => Some(StrategyInfo {
+                name: "EIGEN Strategy",
+                token_symbol: "EIGEN",
+                token_address: Self::EIGEN_TOKEN,
+                description: "EIGEN Token",
+                is_verified: true,
+            }),
+            "0xbeac0eeeeeeeeeeeeeeeeeeeeeeeeeeeeeebeac0" => Some(StrategyInfo {
+                name: "Beacon Chain ETH",
+                token_symbol: "ETH",
+                token_address: "0x0000000000000000000000000000000000000000",
+                description: "Native ETH via Beacon Chain",
+                is_verified: true,
+            }),
+            _ => None,
+        }
+    }
+
+    // Legacy function for backward compatibility
+    pub fn get_strategy_name(address: &str) -> Option<&'static str> {
+        Self::get_strategy_info(address).map(|info| info.name)
+    }
+
+    // Get token symbol from token address
+    pub fn get_token_symbol(address: &str) -> Option<&'static str> {
+        match address.to_lowercase().as_str() {
+            a if a == Self::STETH_TOKEN => Some("stETH"),
+            a if a == Self::CBETH_TOKEN => Some("cbETH"),
+            a if a == Self::RETH_TOKEN => Some("rETH"),
+            a if a == Self::ETHX_TOKEN => Some("ETHx"),
+            a if a == Self::ANKRETH_TOKEN => Some("ankrETH"),
+            a if a == Self::OETH_TOKEN => Some("OETH"),
+            a if a == Self::OSETH_TOKEN => Some("osETH"),
+            a if a == Self::SWETH_TOKEN => Some("swETH"),
+            a if a == Self::WBETH_TOKEN => Some("wBETH"),
+            a if a == Self::SFRXETH_TOKEN => Some("sfrxETH"),
+            a if a == Self::LSETH_TOKEN => Some("lsETH"),
+            a if a == Self::METH_TOKEN => Some("mETH"),
+            a if a == Self::EIGEN_TOKEN => Some("EIGEN"),
+            _ => None,
+        }
+    }
+
+    // Check if an address is a core EigenLayer contract
+    pub fn is_core_contract(address: &str) -> bool {
+        matches!(
+            address.to_lowercase().as_str(),
+            a if a == Self::DELEGATION_MANAGER.to_lowercase()
+                || a == Self::STRATEGY_MANAGER.to_lowercase()
+                || a == Self::EIGENPOD_MANAGER.to_lowercase()
+                || a == Self::AVS_DIRECTORY.to_lowercase()
+                || a == Self::REWARDS_COORDINATOR.to_lowercase()
+                || a == Self::ALLOCATION_MANAGER.to_lowercase()
+        )
+    }
+
+    // Get contract name
+    pub fn get_contract_name(address: &str) -> Option<&'static str> {
+        match address.to_lowercase().as_str() {
+            a if a == Self::DELEGATION_MANAGER.to_lowercase() => Some("DelegationManager"),
+            a if a == Self::STRATEGY_MANAGER.to_lowercase() => Some("StrategyManager"),
+            a if a == Self::EIGENPOD_MANAGER.to_lowercase() => Some("EigenPodManager"),
+            a if a == Self::AVS_DIRECTORY.to_lowercase() => Some("AVSDirectory"),
+            a if a == Self::REWARDS_COORDINATOR.to_lowercase() => Some("RewardsCoordinator"),
+            a if a == Self::ALLOCATION_MANAGER.to_lowercase() => Some("AllocationManager"),
             _ => None,
         }
     }
 }
 
+// Strategy information structure
+pub struct StrategyInfo {
+    pub name: &'static str,
+    pub token_symbol: &'static str,
+    pub token_address: &'static str,
+    pub description: &'static str,
+    pub is_verified: bool,
+}
+
 pub struct EigenLayerVisualizer {}
 
 impl EigenLayerVisualizer {
+    // Helper function to create a divider
+    fn create_divider() -> AnnotatedPayloadField {
+        AnnotatedPayloadField {
+            signable_payload_field: SignablePayloadField::Divider {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: "".to_string(),
+                    label: "".to_string(),
+                },
+                divider: SignablePayloadFieldDivider {
+                    style: DividerStyle::THIN,
+                },
+            },
+            static_annotation: None,
+            dynamic_annotation: None,
+        }
+    }
+
+    // Helper function to create an enhanced address field with all features
+    fn create_address_field(
+        label: &str,
+        address: &str,
+        name: Option<&str>,
+        asset_label: Option<&str>,
+        memo: Option<&str>,
+        badge_text: Option<&str>,
+    ) -> AnnotatedPayloadField {
+        AnnotatedPayloadField {
+            signable_payload_field: SignablePayloadField::AddressV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: address.to_string(),
+                    label: label.to_string(),
+                },
+                address_v2: SignablePayloadFieldAddressV2 {
+                    address: address.to_string(),
+                    name: name.unwrap_or("").to_string(),
+                    asset_label: asset_label.unwrap_or("").to_string(),
+                    memo: memo.map(|s| s.to_string()),
+                    badge_text: badge_text.map(|s| s.to_string()),
+                },
+            },
+            static_annotation: None,
+            dynamic_annotation: None,
+        }
+    }
+
+    // Helper function to create an amount field with formatting and annotations
+    fn create_amount_field(
+        label: &str,
+        amount_wei: U256,
+        token_symbol: Option<&str>,
+        static_annotation: Option<&str>,
+        dynamic_annotation: Option<SignablePayloadFieldDynamicAnnotation>,
+    ) -> AnnotatedPayloadField {
+        let formatted_amount = format_ether(amount_wei);
+
+        AnnotatedPayloadField {
+            signable_payload_field: SignablePayloadField::AmountV2 {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: amount_wei.to_string(),
+                    label: label.to_string(),
+                },
+                amount_v2: SignablePayloadFieldAmountV2 {
+                    amount: formatted_amount,
+                    abbreviation: token_symbol.map(|s| s.to_string()),
+                },
+            },
+            static_annotation: static_annotation.map(|text| SignablePayloadFieldStaticAnnotation {
+                text: text.to_string(),
+            }),
+            dynamic_annotation,
+        }
+    }
+
+    // Helper function to create a number field
+    fn create_number_field(
+        label: &str,
+        number: &str,
+        static_annotation: Option<&str>,
+    ) -> AnnotatedPayloadField {
+        AnnotatedPayloadField {
+            signable_payload_field: SignablePayloadField::Number {
+                common: SignablePayloadFieldCommon {
+                    fallback_text: number.to_string(),
+                    label: label.to_string(),
+                },
+                number: SignablePayloadFieldNumber {
+                    number: number.to_string(),
+                },
+            },
+            static_annotation: static_annotation.map(|text| SignablePayloadFieldStaticAnnotation {
+                text: text.to_string(),
+            }),
+            dynamic_annotation: None,
+        }
+    }
+
     pub fn visualize_tx_commands(&self, input: &[u8]) -> Option<SignablePayloadField> {
         if input.len() < 4 {
             return None;
@@ -622,71 +881,79 @@ impl EigenLayerVisualizer {
     fn visualize_deposit_into_strategy(&self, input: &[u8]) -> Option<SignablePayloadField> {
         let call = IStrategyManager::depositIntoStrategyCall::abi_decode(input).ok()?;
 
-        let mut details = Vec::new();
-
-        // Strategy address with name if known
         let strategy_addr = format!("{:?}", call.strategy);
-        let strategy_name = KnownContracts::get_strategy_name(&strategy_addr)
-            .unwrap_or("Unknown Strategy");
+        let token_addr = format!("{:?}", call.token);
 
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: strategy_addr.clone(),
-                    label: "Strategy".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: strategy_addr,
-                    name: strategy_name.to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: Some("EigenLayer".to_string()),
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Get strategy info
+        let strategy_info = KnownContracts::get_strategy_info(&strategy_addr);
+        let strategy_name = strategy_info.as_ref().map(|i| i.name).unwrap_or("Unknown Strategy");
+        let token_symbol = strategy_info.as_ref()
+            .map(|i| i.token_symbol)
+            .or_else(|| KnownContracts::get_token_symbol(&token_addr));
+
+        // Condensed view - just key info
+        let mut condensed_fields = vec![];
+        condensed_fields.push(Self::create_address_field(
+            "Strategy",
+            &strategy_addr,
+            Some(strategy_name),
+            token_symbol,
+            None,
+            Some("Verified"),
+        ));
+        condensed_fields.push(Self::create_amount_field(
+            "Amount",
+            call.amount,
+            token_symbol,
+            None,
+            None,
+        ));
+
+        // Expanded view - full details
+        let mut expanded_fields = vec![];
+
+        // Strategy with full info
+        expanded_fields.push(Self::create_address_field(
+            "Strategy",
+            &strategy_addr,
+            Some(strategy_name),
+            token_symbol,
+            strategy_info.as_ref().map(|i| i.description),
+            Some("Verified"),
+        ));
+
+        // Divider
+        expanded_fields.push(Self::create_divider());
 
         // Token address
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AddressV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: format!("{:?}", call.token),
-                    label: "Token".to_string(),
-                },
-                address_v2: SignablePayloadFieldAddressV2 {
-                    address: format!("{:?}", call.token),
-                    name: "Deposit Token".to_string(),
-                    asset_label: "".to_string(),
-                    memo: None,
-                    badge_text: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        let token_name = token_symbol.unwrap_or("Token");
+        expanded_fields.push(Self::create_address_field(
+            "Token",
+            &token_addr,
+            Some(token_name),
+            token_symbol,
+            None,
+            None,
+        ));
 
-        // Amount
-        details.push(AnnotatedPayloadField {
-            signable_payload_field: SignablePayloadField::AmountV2 {
-                common: SignablePayloadFieldCommon {
-                    fallback_text: call.amount.to_string(),
-                    label: "Amount".to_string(),
-                },
-                amount_v2: SignablePayloadFieldAmountV2 {
-                    amount: call.amount.to_string(),
-                    abbreviation: None,
-                },
-            },
-            static_annotation: None,
-            dynamic_annotation: None,
-        });
+        // Amount with annotation
+        expanded_fields.push(Self::create_amount_field(
+            "Amount",
+            call.amount,
+            token_symbol,
+            Some("Subject to EigenLayer withdrawal delay"),
+            Some(SignablePayloadFieldDynamicAnnotation {
+                field_type: "strategy_apy".to_string(),
+                id: strategy_addr.clone(),
+                params: vec!["eigenlayer".to_string()],
+            }),
+        ));
 
         Some(SignablePayloadField::PreviewLayout {
             common: SignablePayloadFieldCommon {
                 fallback_text: format!(
-                    "Deposit {} tokens into {} ({:?})",
-                    call.amount, strategy_name, call.strategy
+                    "Deposit {} into {}",
+                    format_ether(call.amount), strategy_name
                 ),
                 label: "EigenLayer Deposit".to_string(),
             },
@@ -695,10 +962,10 @@ impl EigenLayerVisualizer {
                     text: "EigenLayer: Deposit Into Strategy".to_string(),
                 }),
                 subtitle: Some(SignablePayloadFieldTextV2 {
-                    text: format!("Deposit {} tokens into {}", call.amount, strategy_name),
+                    text: format!("Deposit {} {} into {}", format_ether(call.amount), token_symbol.unwrap_or("tokens"), strategy_name),
                 }),
-                condensed: None,
-                expanded: Some(SignablePayloadFieldListLayout { fields: details }),
+                condensed: Some(SignablePayloadFieldListLayout { fields: condensed_fields }),
+                expanded: Some(SignablePayloadFieldListLayout { fields: expanded_fields }),
             },
         })
     }
